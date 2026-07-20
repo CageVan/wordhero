@@ -2178,9 +2178,13 @@ function addNewBookFromInput(inputId){
 function isBookPicked(){
   return !!(LEARNING_BOOK && LEARNING_BOOK!=="全部" && LEARNING_BOOK!=="all");
 }
+/* 自定义书本（家长新建、尚无单词时也能持久存在，刷新不丢） */
+function customBooksLS(){ try{ return JSON.parse(localStorage.getItem("wh_custom_books")||"[]"); }catch(e){ return []; } }
+function customBooksAdd(name){ const a=customBooksLS(); if(name && !a.includes(name)){ a.push(name); try{ localStorage.setItem("wh_custom_books",JSON.stringify(a)); }catch(e){} } }
 /* 列出可选书本（含"全部"） */
 function availableBooks(){
   const set=new Set(WORDS.map(w=>w.book||"自己添加"));
+  customBooksLS().forEach(b=>set.add(b));
   return ["全部"].concat(Array.from(set));
 }
 /* 取当前词库范围的词（"全部"返回所有；未选返回空） */
@@ -3604,7 +3608,7 @@ function parentSection(kids){
   h+=`<button class="btn" id="addKid" style="width:100%;margin-top:10px">➕ 添加孩子</button>
       <button class="btn" id="viewKids" style="width:100%;margin-top:8px">📊 查看孩子数据</button>
       <button class="btn" id="parentBookMgr" style="width:100%;margin-top:8px;background:#eaf3ff;color:var(--accent)">📚 我的书本（重命名/删除）</button>
-      <button class="btn" id="parentWordMgr" style="width:100%;margin-top:8px;background:#fdeceb;color:#e0524d">🗑 词库批量管理（删除单词）</button>`;
+      <button class="btn" id="parentWordMgr" style="width:100%;margin-top:8px;background:#fdeceb;color:#e0524d">📚 词库批量管理（添加/编辑/删除）</button>`;
   return h;
 }
 function bindParentSection(kids){
@@ -3700,97 +3704,188 @@ function openBookManager(){
     if(confirm("已新建书本「"+v+"」。\n点确定去「➕ 添加」页加第一个词，点取消留在本页。")){
       closeModal();
       const v2=document.querySelector('.tab[data-tab="add"]'); if(v2) v2.click();
-      if(typeof addBookState!=="undefined"){ addBookState.picked=v; }
-    }else{
-      if(typeof addBookState!=="undefined"){
-        addBookState.custom=addBookState.custom||[];
-        if(!addBookState.custom.includes(v)) addBookState.custom.push(v);
-      }
+    if(typeof addBookState!=="undefined"){ addBookState.picked=v; }
+    customBooksAdd(v);
+  }else{
+    if(typeof addBookState!=="undefined"){
+      addBookState.custom=addBookState.custom||[];
+      if(!addBookState.custom.includes(v)) addBookState.custom.push(v);
     }
+    customBooksAdd(v);
+  }
   }
   document.getElementById("bmAdd").onclick=addBook;
   document.getElementById("bmNew").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addBook(); } });
   document.getElementById("bmClose").onclick=()=>closeModal();
   render();
 }
-/* 家长词库批量管理：可按词库筛选、勾选、批量删除 */
+/* 家长词库批量管理：添加 / 编辑 / 删除 三合一（选择统一用单词 id，避免下标错位） */
 function openParentWordMgr(){
   const books={};
-  WORDS.forEach(w=>{ const b=w.book||"(无词库)"; if(!books[b])books[b]=0; books[b]++; });
+  WORDS.forEach(w=>{ const b=w.book||"(无词库)"; books[b]=(books[b]||0)+1; });
   const bookOpts=Object.keys(books).sort().map(b=>`<option value="${esc(b)}">${esc(b)}（${books[b]}词）</option>`).join("");
-  const html=`<div class="card" style="padding:16px;max-width:420px">
-    <h3 style="margin:0 0 6px">🗑 词库批量管理</h3>
-    <p class="muted small" style="font-size:12px;margin:0 0 8px">勾选要删除的单词，点"确认删除"。删除后立即同步云端，所有设备生效。</p>
+  const allBookOpts=`<option value="">（默认“自己添加”）</option>`+Object.keys(books).sort().map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join("");
+  const html=`<div class="card" style="padding:16px;max-width:440px">
+    <h3 style="margin:0 0 6px">📚 家长词库批量管理</h3>
+    <p class="muted small" style="font-size:12px;margin:0 0 8px">一个面板搞定：<b>添加</b>新词、<b>编辑</b>（移动词库 / 单独改词义）、<b>删除</b>单词。改动即时存本机并同步云端。</p>
     <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn" data-pmmode="add" style="flex:1">➕ 添加</button>
+      <button class="btn" data-pmmode="edit" style="flex:1">✏️ 编辑</button>
+      <button class="btn" data-pmmode="delete" style="flex:1">🗑 删除</button>
+    </div>
+    <div id="pmCommon" style="display:flex;gap:6px;margin-bottom:8px">
       <select id="pmBook" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:8px"><option value="">全部词库</option>${bookOpts}</select>
       <input id="pmSearch" placeholder="搜索单词" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:8px">
     </div>
-    <div style="max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px" id="pmList"></div>
+    <div id="pmAddPanel" style="display:none;margin-bottom:8px">
+      <textarea id="pmBatch" rows="6" placeholder="每行一个词，用 | 分隔：&#10;review | 复习；回顾&#10;communicate | 沟通；交流" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:13px;resize:vertical"></textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <span class="muted small" style="white-space:nowrap">目标词库</span>
+        <select id="pmAddBook" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:8px">${allBookOpts}</select>
+      </div>
+      <button class="btn green" id="pmImport" style="width:100%;margin-top:6px">📥 导入到词库</button>
+      <div id="pmAddResult" class="small muted" style="margin-top:6px"></div>
+    </div>
+    <div id="pmEditBar" style="display:none;gap:6px;margin-bottom:8px;align-items:center">
+      <span class="muted small" style="white-space:nowrap">选中 → 移动到</span>
+      <select id="pmMoveBook" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:8px">${allBookOpts}</select>
+      <button class="btn" id="pmMoveBtn" style="flex:0 0 auto">应用</button>
+    </div>
+    <div style="max-height:42vh;overflow:auto;border:1px solid var(--line);border-radius:8px" id="pmList"></div>
     <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
       <button class="btn ghost" id="pmSelectAll" style="flex:1">全选</button>
       <button class="btn ghost" id="pmSelectNone" style="flex:1">取消全选</button>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px">
       <button class="btn ghost" id="pmCancel" style="flex:1">取消</button>
-      <button class="btn" id="pmDelete" style="flex:1;background:#e0524d;color:#fff">确认删除</button>
+      <button class="btn" id="pmDelete" style="flex:1;background:#e0524d;color:#fff;display:none">确认删除</button>
     </div>
     <div id="pmCount" style="text-align:center;font-size:12px;color:var(--muted);margin-top:6px"></div>
   </div>`;
   openModal(html);
-  function pmRender(){
+  let mode="delete";
+  const selIds=new Set();
+  function shownWords(){
     const bk=document.getElementById("pmBook").value, q=(document.getElementById("pmSearch").value||"").trim().toLowerCase();
+    return WORDS.filter(w=>{
+      if(bk && (w.book||"(无词库)")!==bk) return false;
+      if(q && !((w.term||"")+" "+(w.mean||"")).toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+  function pmRender(){
     const list=document.getElementById("pmList"); list.innerHTML="";
-    let shown=0;
-    WORDS.forEach((w,i)=>{
-      if(bk && (w.book||"(无词库)")!==bk) return;
-      if(q && !((w.term||"")+" "+(w.mean||"")).toLowerCase().includes(q)) return;
-      shown++;
+    const arr=shownWords();
+    if(!arr.length){ list.innerHTML=`<div class="muted small" style="padding:14px;text-align:center">没有匹配的单词</div>`; }
+    arr.forEach(w=>{
       const row=document.createElement("label");
       row.style.cssText="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px";
-      row.innerHTML=`<input type="checkbox" class="pmCk" value="${i}" style="width:18px;height:18px"><span style="flex:1"><b>${esc(w.term||"")}</b> <span style="color:var(--muted);font-size:11px">${esc(w.mean||"")}</span></span>${w.locked?'<span style="font-size:10px;color:#999">🔒</span>':''}`;
+      const checked=selIds.has(w.id)?"checked":"";
+      row.innerHTML=`<input type="checkbox" class="pmCk" value="${esc(w.id)}" ${checked} style="width:18px;height:18px">
+        <span class="pmTerm" data-edit="${esc(w.id)}" style="flex:1"><b>${esc(w.term||"")}</b> <span style="color:var(--muted);font-size:11px">${esc((w.book?("📖"+w.book+" · "):"")+(w.mean||""))}</span></span>
+        ${w.locked?'<span style="font-size:10px;color:#999">🔒</span>':''}`;
       list.appendChild(row);
     });
-    document.getElementById("pmCount").textContent="显示 "+shown+" / 共 "+WORDS.length+" 个";
-    pmUpdateSel();
+    const cnt=document.getElementById("pmCount");
+    if(cnt) cnt.textContent="显示 "+arr.length+" / 共 "+WORDS.length+" 个，已选 "+selIds.size+" 个";
+    list.querySelectorAll("[data-edit]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); e.preventDefault(); openEditWord(el.getAttribute("data-edit")); });
   }
-  function pmUpdateSel(){
-    const n=document.querySelectorAll(".pmCk:checked").length;
-    document.getElementById("pmCount").textContent="已选 "+n+" 个";
+  function setMode(m){
+    mode=m;
+    document.querySelectorAll("[data-pmmode]").forEach(b=>{
+      const on=(b.getAttribute("data-pmmode")===m);
+      b.style.background=on?"linear-gradient(90deg,var(--accent),var(--accent2))":"";
+      b.style.color=on?"#fff":"";
+    });
+    const dis=(x)=>{ const el=document.getElementById(x); if(el) el.style.display=(m==="add")?"none":""; };
+    dis("pmCommon"); dis("pmList"); dis("pmSelectAll"); dis("pmSelectNone");
+    const addP=document.getElementById("pmAddPanel"); if(addP) addP.style.display=(m==="add")?"block":"none";
+    const editB=document.getElementById("pmEditBar"); if(editB) editB.style.display=(m==="edit")?"flex":"none";
+    const del=document.getElementById("pmDelete"); if(del) del.style.display=(m==="delete")?"":"none";
   }
-  pmRender();
+  document.querySelectorAll("[data-pmmode]").forEach(btn=>btn.onclick=()=>setMode(btn.getAttribute("data-pmmode")));
   document.getElementById("pmBook").onchange=pmRender;
   document.getElementById("pmSearch").oninput=pmRender;
-  document.getElementById("pmList").addEventListener("change",pmUpdateSel);
-  document.getElementById("pmSelectAll").onclick=()=>{document.querySelectorAll(".pmCk").forEach(c=>c.checked=true); pmUpdateSel();};
-  document.getElementById("pmSelectNone").onclick=()=>{document.querySelectorAll(".pmCk").forEach(c=>c.checked=false); pmUpdateSel();};
+  document.getElementById("pmList").addEventListener("change",(e)=>{
+    if(e.target.classList.contains("pmCk")){
+      const id=e.target.value;
+      if(e.target.checked) selIds.add(id); else selIds.delete(id);
+      const c=document.getElementById("pmCount");
+      if(c) c.textContent="显示 "+shownWords().length+" / 共 "+WORDS.length+" 个，已选 "+selIds.size+" 个";
+    }
+  });
+  document.getElementById("pmSelectAll").onclick=()=>{ shownWords().forEach(w=>selIds.add(w.id)); pmRender(); };
+  document.getElementById("pmSelectNone").onclick=()=>{ shownWords().forEach(w=>selIds.delete(w.id)); pmRender(); };
   document.getElementById("pmCancel").onclick=closeModal;
   document.getElementById("pmDelete").onclick=async()=>{
-    const cks=[...document.querySelectorAll(".pmCk:checked")].map(c=>+c.value);
-    if(!cks.length){toast("未选中任何单词");return;}
-    if(!confirm("确定删除选中的 "+cks.length+" 个单词？")) return;
+    if(!selIds.size){ toast("未选中任何单词"); return; }
+    const n=selIds.size;
+    if(!confirm("确定删除选中的 "+n+" 个单词？")) return;
     if(!confirm("⚠️ 再次确认：删除后不可恢复，所有设备同步生效。确定？")) return;
-    const delIds=cks.map(i=>WORDS[i].id).filter(Boolean);
-    const delSet=new Set(cks.sort((a,b)=>b-a));
-    WORDS=WORDS.filter((w,i)=>!delSet.has(i));
-    save();
-    // 上传到云端，同时标记编辑器同步（让其他设备也删除）
-    const c=cloudCreds();
-    if(c.url&&c.key){
-      try{
-        const ts=new Date().toISOString();
-        const body=[{device_id:deviceId(),user_name:ckNameNow()||"未命名",
-          payload:{words:WORDS,streak:STREAK,pack:PACK,children:accChildren(),editorSyncAt:ts,editorDeletedIds:delIds},
-          stats:computeStats(),updated_at:ts}];
-        await fetch(c.url+"/rest/v1/wordhero_backups?on_conflict=device_id",{method:"POST",
-          headers:Object.assign({},cloudHeaders(c.key),{"Prefer":"resolution=merge-duplicates,return=minimal"}),
-          body:JSON.stringify(body)});
-        localStorage.setItem("wh_editorSync",ts);
-      }catch(e){}
+    const delIds=[...selIds];
+    WORDS=WORDS.filter(w=>!selIds.has(w.id));
+    selIds.clear();
+    save(); renderLib();
+    await cloudUploadWithDeleted(delIds);
+    closeModal(); renderStats(); toast("已删除 "+n+" 个单词");
+  };
+  document.getElementById("pmImport").onclick=()=>{
+    const lines=(document.getElementById("pmBatch").value||"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
+    const target=(document.getElementById("pmAddBook").value||"")||"自己添加";
+    if(!lines.length){ toast("请先粘贴要添加的词"); return; }
+    let added=0,skipped=0,msg=[];
+    const exist=new Set(WORDS.filter(w=>(w.book||"自己添加")===target).map(w=>(w.term||"").toLowerCase()));
+    for(const line of lines){
+      const p=line.split("|").map(s=>s.trim());
+      const term=p[0]; if(!term) continue;
+      if(exist.has(term.toLowerCase())){ skipped++; msg.push("• "+term+" ——「"+target+"」已存在，跳过"); continue; }
+      WORDS.unshift({id:uid(),term,phon:p[2]||"",mean:p[1]||"",ex:p[3]||"",exCn:p[4]||"",book:target,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[{t:now(),act:"add"}],source:"user"});
+      exist.add(term.toLowerCase()); added++;
     }
-    toast("已删除 "+cks.length+" 个单词");
-    closeModal();
-    if(typeof renderLib==="function")renderLib();
-    renderStats();
+    if(added){ customBooksAdd(target); save(); renderLib(); renderStats(); if(typeof cloudUpload==="function") cloudUpload(true); }
+    document.getElementById("pmAddResult").innerHTML="新增 <b>"+added+"</b> 个到「"+target+"」，跳过 <b>"+skipped+"</b> 个重复。<br>"+(msg.join("<br>")||"");
+    if(added) toast("✅ 批量导入 "+added+" 个到「"+target+"」");
+  };
+  document.getElementById("pmMoveBtn").onclick=()=>{
+    const target=(document.getElementById("pmMoveBook").value||"")||"自己添加";
+    if(!selIds.size){ toast("请先勾选要移动的单词"); return; }
+    let cnt=0;
+    WORDS.forEach(w=>{ if(selIds.has(w.id)){ w.book=target; cnt++; } });
+    customBooksAdd(target);
+    save(); renderLib(); if(typeof cloudUpload==="function") cloudUpload(true);
+    selIds.clear(); pmRender(); renderStats();
+    toast("已移动 "+cnt+" 个单词到「"+target+"」");
+  };
+  setMode("delete"); pmRender();
+}
+/* 单独编辑一个单词（家长）：保存后重开管理面板，保持连续操作 */
+function openEditWord(id){
+  const w=WORDS.find(x=>x.id===id); if(!w) return;
+  const html=`<div class="card" style="padding:16px;max-width:380px">
+    <h3 style="margin:0 0 6px">✏️ 编辑单词</h3>
+    <label>单词</label><input id="ewTerm" value="${esc(w.term||"")}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px">
+    <label>音标</label><input id="ewPhon" value="${esc(w.phon||"")}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px">
+    <label>释义</label><input id="ewMean" value="${esc(w.mean||"")}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px">
+    <label>例句(英)</label><input id="ewEx" value="${esc(w.ex||"")}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px">
+    <label>例句(中)</label><input id="ewExCn" value="${esc(w.exCn||"")}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px">
+    <label>所属词库</label><input id="ewBook" value="${esc(w.book||"自己添加")}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px">
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn ghost" id="ewCancel" style="flex:1">取消</button>
+      <button class="btn green" id="ewSave" style="flex:1">保存</button>
+    </div>
+  </div>`;
+  openModal(html);
+  document.getElementById("ewCancel").onclick=closeModal;
+  document.getElementById("ewSave").onclick=()=>{
+    const nb=(document.getElementById("ewBook").value.trim())||"自己添加";
+    w.term=document.getElementById("ewTerm").value.trim();
+    w.phon=document.getElementById("ewPhon").value.trim();
+    w.mean=document.getElementById("ewMean").value.trim();
+    w.ex=document.getElementById("ewEx").value.trim();
+    w.exCn=document.getElementById("ewExCn").value.trim();
+    w.book=nb; customBooksAdd(nb);
+    save(); renderLib(); renderStats(); if(typeof cloudUpload==="function") cloudUpload(true);
+    closeModal(); openParentWordMgr(); toast("已保存修改");
   };
 }
 function openAddKid(){
