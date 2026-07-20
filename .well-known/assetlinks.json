@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.github.cagevan.twa",
+    "sha256_cert_fingerprints": [
+      "51:E6:98:1D:7B:E3:3B:A4:7F:30:A5:DA:FB:E6:D0:84:E9:DB:2D:F0:E3:A7:44:F5:87:C4:0C:3C:A2:A9:FA:55"
+    ]
+  }
+}]
