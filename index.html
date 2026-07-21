@@ -38,6 +38,7 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   .stat{flex:1;min-width:120px;background:var(--card);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow)}
   .stat .n{font-size:24px;font-weight:800}
   .stat .l{font-size:12px;color:var(--muted)}
+  .stat .ls{font-size:11px;color:var(--muted);margin-top:3px}
   .tabs{position:sticky;top:var(--safe-top);z-index:20;display:flex;gap:6px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px;border-radius:16px;margin-bottom:16px;box-shadow:var(--shadow);overflow:auto}
   .tab{flex:1;min-width:64px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:14px;padding:10px 6px;border-radius:12px;cursor:pointer;white-space:nowrap}
   .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 6px 16px rgba(91,140,255,.35)}
@@ -235,6 +236,49 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
     .stat .n{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
     .pv-bar .ttl{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
   }
+  /* ====== 手风琴折叠 ====== */
+  .acc{border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .acc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;background:#fbfdff;cursor:pointer;font-weight:800;font-size:14px;border-bottom:1px solid var(--line)}
+  .acc-h:last-of-type{border-bottom:none}
+  .acc-h .acc-ar{transition:transform .2s;color:var(--accent);font-style:normal;font-weight:900;font-size:18px}
+  .acc-h.open .acc-ar{transform:rotate(90deg)}
+  .acc-b{display:none;padding:12px 14px;font-size:13.5px;color:#3a4763;line-height:1.7;background:#fff;border-bottom:1px solid var(--line)}
+  .acc-b b{color:var(--accent)}
+  .acc-h.open + .acc-b{display:block}
+  /* ====== 四宫格（各方式进度） ====== */
+  .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mgrid .mcell{background:var(--soft);border-radius:14px;padding:12px;text-align:center;position:relative;overflow:hidden}
+  .mgrid .mcell .mi{font-size:26px}
+  .mgrid .mcell .mn{font-size:18px;font-weight:800;margin-top:2px}
+  .mgrid .mcell .ml{font-size:12px;color:var(--muted)}
+  .mgrid .mcell.pass{background:linear-gradient(135deg,#eafff6,#eef3ff)}
+  .mgrid .mcell .mbar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px}
+  .mgrid .mcell .mbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  /* ====== 书本进度渐变百分比 ====== */
+  .lib-book{display:flex;align-items:center;gap:10px;padding:12px;border:2px solid var(--line);border-radius:14px;margin:8px 0;cursor:pointer;background:#fff}
+  .lib-book:hover{border-color:#cdd9f2}
+  .lib-book .bb-name{flex:1;min-width:0;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lib-book .bb-meta{font-size:12px;color:var(--muted);white-space:nowrap}
+  .bb-prog{position:relative;width:54px;height:54px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff}
+  .bb-prog .bb-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--pcol) calc(var(--pp)*1%), #e7ecf5 0)}
+  .bb-prog .bb-txt{position:relative;z-index:1;background:#fff;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--pcol)}
+  .lib-sort{display:flex;gap:6px;margin:4px 0 8px}
+  /* ====== 日历热力（连续天数） ====== */
+  .cal-heat{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal-heat .d{aspect-ratio:1;border-radius:9px;background:#f0f3fa;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#9aa3b0;cursor:pointer;position:relative}
+  .cal-heat .d.studied{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+  .cal-heat .d.today{outline:3px solid #ffd166}
+  .cal-heat .d.out{opacity:.4}
+  .cal-heat .d .dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#fff}
+  .cal-heat .d.nostudy{background:#ffe3e6;color:#e0524d}
+  .cal-legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px}
+  .cal-legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
+  /* ====== 单词条 “更多” 展开 ====== */
+  .more-row{text-align:center;margin:4px 0}
+  .more-btn{font-size:13px;font-weight:800;color:var(--accent);background:#eef3ff;border:none;border-radius:999px;padding:7px 16px;cursor:pointer}
+  .weakitem{cursor:pointer}
+  .weakitem:active{transform:scale(.99)}
 </style>
 </head>
 <body>
@@ -370,24 +414,34 @@ communicate | 交流；沟通"></textarea>
   <section class="panel" id="help">
     <div class="card center">
       <h2>📲 扫码安装到手机</h2>
-      <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgNDUwIDQ1MCI+PHBhdGggdHJhbnNmb3JtPSJzY2FsZSgxMCkiIGNsYXNzPSJxcmxpbmUiIHN0cm9rZT0iIzAwMCIgZD0iTTQgNC41aDdtMSAwaDJtMSAwaDJtMSAwaDFtMyAwaDFtMSAwaDFtMiAwaDFtMyAwaDJtMSAwaDdtLTM3IDFoMW01IDBoMW0yIDBoMW0xIDBoMW0xIDBoM20zIDBoM20xIDBoM20xIDBoMm0xIDBoMW01IDBoMW0tMzcgMWgxbTEgMGgzbTEgMGgxbTEgMGgxbTEgMGgybTIgMGgxbTcgMGgxbTMgMGgxbTEgMGgxbTEgMGgxbTEgMGgzbTEgMGgxbS0zNyAxaDFtMSAwaDNtMSAwaDFtMSAwaDNtNCAwaDFtNiAwaDFtNCAwaDFtMiAwaDFtMSAwaDNtMSAwaDFtLTM3IDFoMW0xIDBoM20xIDBoMW0zIDBoMW0xIDBoMm0xIDBoMW0xIDBoMm0xIDBoMW0yIDBoMW0xIDBoMW0xIDBoMW0yIDBoMW0xIDBoM20xIDBoMW0tMzcgMWgxbTUgMGgxbTEgMGgybTEgMGgxbTYgMGgxbTEgMGgybTMgMGgxbTEgMGgybTEgMGgxbTUgMGgxbS0zNyAxaDdtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDdtLTI5IDFoMW0xIDBoMW02IDBoMW0zIDBoMm0xIDBoMW0tMjQgMWgxbTEgMGgxbTEgMGg1bTEgMGgzbTEgMGgybTEgMGg1bTIgMGg3bTEgMGgybTEgMGgxbS0zNyAxaDFtMyAwaDFtMiAwaDJtMiAwaDFtNCAwaDFtMSAwaDVtMyAwaDFtMSAwaDNtMiAwaDFtMiAwaDFtLTM2IDFoMW0yIDBoM20zIDBoMW0xIDBoMW0xIDBoMW0yIDBoMW0xIDBoMW00IDBoMW01IDBoMW0xIDBoM20xIDBoMW0tMzQgMWgybTIgMGgybTUgMGgybTQgMGg0bTEgMGgxbTEgMGgybTMgMGgxbS0zMyAxaDFtNCAwaDJtMiAwaDNtMSAwaDJtMSAwaDFtMSAwaDFtMSAwaDJtMyAwaDFtMyAwaDNtMyAwaDJtLTM3IDFoMm01IDBoMm0xIDBoMW0xIDBoMm0yIDBoMW0xIDBoNG02IDBoMW0xIDBoMW0yIDBoMW0xIDBoMm0tMzcgMWgxbTEgMGgxbTIgMGgybTEgMGgybTIgMGgxbTEgMGgzbTEgMGgybTEgMGg2bTEgMGgxbTEgMGgxbTMgMGgxbTEgMGgxbS0zNyAxaDNtMSAwaDJtMyAwaDFtNSAwaDJtMiAwaDNtMSAwaDNtMyAwaDFtMSAwaDFtLTMyIDFoMm0xIDBoMm0xIDBoMW0xIDBoNW0zIDBoNG0xIDBoMm0xIDBoMW0xIDBoMW0xIDBoMW0xIDBoMW0yIDBoNG0tMzcgMWgybTggMGgxbTEgMGgxbTEgMGgybTEgMGgxbTMgMGgxbTEgMGgzbTMgMGg0bTMgMGgxbS0zNiAxaDFtMSAwaDFtMSAwaDNtMyAwaDFtMSAwaDRtMSAwaDJtMiAwaDFtMiAwaDJtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDNtLTM3IDFoMW0xIDBoMW0xIDBoMm0yIDBoM20yIDBoM20xIDBoMW0xIDBoMW0xIDBoMW0yIDBoMW0yIDBoMW0yIDBoMW0zIDBoMW0xIDBoMW0tMzUgMWg3bTIgMGgybTEgMGg4bTEgMGg0bTEgMGgxbTEgMGgzbTIgMGgxbS0zNiAxaDNtMSAwaDFtMyAwaDJtMSAwaDFtMiAwaDJtMSAwaDFtMyAwaDFtNyAwaDJtMiAwaDFtMSAwaDJtLTM1IDFoMm0xIDBoNG0xIDBoMW0yIDBoMm0xIDBoMW0xIDBoMm00IDBoM20zIDBoM20xIDBoM20tMzYgMWgxbTEgMGgxbTUgMGg0bTEgMGgxbTMgMGgybTEgMGgxbTEgMGgxbTEgMGgxbTQgMGgxbTEgMGgybTIgMGgxbS0zNyAxaDFtMSAwaDFtMSAwaDVtMiAwaDJtMSAwaDJtMSAwaDFtMSAwaDFtMSAwaDJtMiAwaDZtMiAwaDFtMSAwaDFtLTM0IDFoM20yIDBoMW0xIDBoM20xIDBoM20xIDBoMW0yIDBoMm04IDBoMm0zIDBoMm0tMzcgMWgxbTMgMGg2bTEgMGgxbTQgMGgxbTIgMGgxbTIgMGg1bTIgMGgybTIgMGgxbTIgMGgxbS0zNiAxaDVtMSAwaDFtMSAwaDJtMSAwaDJtMSAwaDJtMiAwaDNtMyAwaDFtMSAwaDJtMSAwaDFtNCAwaDFtLTM2IDFoNW0xIDBoMm0xIDBoMW0zIDBoM20yIDBoMW0xIDBoM20xIDBoMW0xIDBoMW0xIDBoNW0xIDBoMW0tMjcgMWgxbTEgMGg2bTIgMGgybTIgMGgzbTIgMGgybTMgMGgxbTMgMGgxbS0zNyAxaDdtMSAwaDRtMSAwaDFtMSAwaDFtMSAwaDJtMSAwaDNtMyAwaDNtMSAwaDFtMSAwaDFtMSAwaDNtLTM3IDFoMW01IDBoMW0xIDBoM200IDBoMm00IDBoMW0xIDBoMW00IDBoMW0zIDBoMW0xIDBoMW0xIDBoMW0tMzcgMWgxbTEgMGgzbTEgMGgxbTggMGgxbTYgMGgybTEgMGgybTEgMGg2bTEgMGgybS0zNyAxaDFtMSAwaDNtMSAwaDFtMSAwaDJtMSAwaDFtMiAwaDFtMiAwaDNtMSAwaDFtMiAwaDJtMSAwaDFtMSAwaDFtMiAwaDJtMiAwaDFtLTM3IDFoMW0xIDBoM20xIDBoMW0yIDBoNW0yIDBoNW0zIDBoMm0xIDBoMW0xIDBoMW0xIDBoNG0xIDBoMW0tMzcgMWgxbTUgMGgxbTEgMGgxbTYgMGgxbTEgMGgxbTEgMGgzbTEgMGg0bTEgMGgybTEgMGgzbS0zNCAxaDdtMyAwaDFtMyAwaDRtMiAwaDZtMiAwaDFtMiAwaDNtMSAwaDIiLz48L3N2Zz4NCg==" alt="安装二维码" style="width:220px;max-width:70%;height:auto;background:#fff;padding:10px;border-radius:14px;box-shadow:var(--shadow)">
+      <img src="data:image/png;base64,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" alt="扫码安装" alt="安装二维码" style="width:220px;max-width:70%;height:auto;background:#fff;padding:10px;border-radius:14px;box-shadow:var(--shadow)">
       <p class="muted">两种方式任选其一，都能把单词本装到手机桌面：<br>① 用手机相机或浏览器扫上方二维码；② 点浏览器右上角 ⋮ →「安装应用 / 添加到主屏幕」。装好后离线也能用，且<b>自动更新</b>，无需重装。</p>
       <div class="small muted">或手动复制安装地址，在手机浏览器打开：<br><b id="installUrl">（加载中…）</b><br><button class="btn ghost" id="copyUrlBtn" style="margin-top:6px;padding:6px 12px;font-size:12px">📋 复制地址</button></div>
     </div>
     <div class="card">
       <h2>怎么用这个系统？</h2>
-      <ul class="tips">
-        <li><b>学习页</b>：每天自动锁定一批新词（默认 5 个，可在「📌 今日新词学习」处改成 10 / 20 / 全部；当天固定不变，跨天或添加新词后才换）。四种玩法（闪卡翻牌 / 选择题 / 拼写 / 听音选词）各自独立通关——一种练完不影响其他，点“▶ 开始”直接开练。</li>
-        <li><b>闪卡</b>：点卡片翻面看释义，再点“认识 / 模糊 / 不认识”，系统会记录你的掌握度。</li>
-        <li><b>今日遗忘预警</b>：根据遗忘曲线（掌握度越低复习间隔越短），自动列出今天该复习的已学单词；点单词看解释，点「▶ 去复习」开练。</li>
-        <li><b>薄弱词巩固</b>：主页会标出掌握度低于 60% 的「薄弱词」并提醒你；在「学习」页点「⚠️ 薄弱词巩固 › 开始巩固」可把这些词单独拉出来练。</li>
-        <li><b>练习页上方</b>：进入任意练习后，顶部有一排「🃏 闪卡 / ✅ 选择题 / ✍️ 拼写 / 🔊 听音」按钮，练着练着可随时换一种方式，不用退出重进（今日新词学习仍保持四种方式各自独立通关）。</li>
-        <li><b>添加页</b>：加新词时如果词库里已有，会弹出提示“你 X 天前背过啦”，不会重复添加；拼写很像的词（如 comunicate 和 communicate）也会提醒你。</li>
-        <li><b>词库页</b>：随时搜索、查看每个词的复习历史和掌握度。</li>
-        <li><b>发音</b>：点 🔊 按钮听标准英语发音，单词和例句都能读。电脑 / 带英文嗓音的设备会用系统朗读（可离线）；<b>手机 App 会自动改用在线音频发音（需联网）</b>，多个音源自动切换，联网即可正常出声。可在下方“🔊 发音设置”里切换美式 / 英式口音。</li>
-        <li><b>🔍 联网查词 / 翻译</b>：在“词库”页顶部输入单词点“查词”，会联网给出音标、词性、英文释义、例句和<b>中文翻译</b>；点“📌 看例子：查 review”能直接看一个完整示例。添加新词时也可以先“联网查一下”让系统自动帮你填好释义/音标/例句。</li>
-        <li><b>数据安全</b>：所有单词只存在你这台设备的浏览器里。想换设备？用“设置”里的导出/导入把词库带走。</li>
-      </ul>
+      <div class="acc">
+        <div class="acc-h" onclick="toggleAcc(this)"><span>📘 学习页</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">每天自动锁定一批新词（默认 5 个，可在「📌 今日新词学习」处改成 10 / 20 / 全部；当天固定不变，跨天或添加新词后才换）。四种玩法（闪卡翻牌 / 选择题 / 拼写 / 听音选词）各自独立通关——一种练完不影响其他，点“▶ 开始”直接开练。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>🃏 闪卡</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">点卡片翻面看释义，再点“认识 / 模糊 / 不认识”，系统会记录你的掌握度。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>🔥 今日遗忘预警</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">根据遗忘曲线（掌握度越低复习间隔越短），自动列出今天该复习的已学单词；点单词看解释，点「▶ 去复习」开练。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>⚠️ 薄弱词巩固</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">主页会标出掌握度低于 60% 的「薄弱词」并提醒你；在「学习」页点「⚠️ 薄弱词巩固 › 开始巩固」可把这些词单独拉出来练。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>🔄 练习页上方换方式</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">进入任意练习后，顶部有一排「🃏 闪卡 / ✅ 选择题 / ✍️ 拼写 / 🔊 听音」按钮，练着练着可随时换一种方式，不用退出重进（今日新词学习仍保持四种方式各自独立通关）。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>➕ 添加页</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">加新词时如果词库里已有，会弹出提示“你 X 天前背过啦”，不会重复添加；拼写很像的词（如 comunicate 和 communicate）也会提醒你。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>📚 词库页</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">随时搜索、查看每个词的复习历史和掌握度。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>🔊 发音</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">点 🔊 按钮听标准英语发音，单词和例句都能读。电脑 / 带英文嗓音的设备会用系统朗读（可离线）；<b>手机 App 会自动改用在线音频发音（需联网）</b>，多个音源自动切换，联网即可正常出声。可在下方“🔊 发音设置”里切换美式 / 英式口音。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>🌐 联网查词 / 翻译</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">在“词库”页顶部输入单词点“查词”，会联网给出音标、词性、英文释义、例句和<b>中文翻译</b>；点“📌 看例子：查 review”能直接看一个完整示例。添加新词时也可以先“联网查一下”让系统自动帮你填好释义/音标/例句。</div>
+        <div class="acc-h" onclick="toggleAcc(this)"><span>🔒 数据安全</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">所有单词只存在你这台设备的浏览器里。想换设备？用“设置”里的导出/导入把词库带走。</div>
+      </div>
     </div>
     <div class="card">
       <h2>🔊 发音设置</h2>
@@ -2152,13 +2206,35 @@ function adminAddWords(books,i){
   if(added) adminSave(books); else toast("没有新词（可能都已存在）");
 }
 function adminChangePwd(){
-  const o=(prompt("输入当前管理密码：")||"").trim(); if(!o) return;
-  const n=(prompt("输入新管理密码：")||"").trim(); if(!n) return;
-  const c=(prompt("再次输入新管理密码：")||"").trim(); if(c!==n){ toast("两次不一致"); return; }
-  setAdminPwdRemote(o,n).then(r=>{
-    if(r.ok){ ADMIN_PWD=n; try{sessionStorage.setItem("wh_admin_ok","1");}catch(e){} toast("✅ 管理密码已更新"); }
-    else{ toast("❌ 修改失败："+(r.status||r.err||"当前密码可能错误")); }
-  });
+  const html=`<div class="card" style="padding:18px;max-width:340px">
+    <h3 style="margin:0 0 6px">🔑 修改管理密码</h3>
+    <label>当前管理密码</label>
+    <input id="apOld" type="password" style="width:100%;padding:10px;font-size:15px;border:2px solid var(--line);border-radius:10px" placeholder="当前密码">
+    <label style="margin-top:10px">新管理密码</label>
+    <input id="apNew" type="password" style="width:100%;padding:10px;font-size:15px;border:2px solid var(--line);border-radius:10px" placeholder="新密码">
+    <label style="margin-top:10px">再次输入新密码</label>
+    <input id="apCfm" type="password" style="width:100%;padding:10px;font-size:15px;border:2px solid var(--line);border-radius:10px" placeholder="再次输入">
+    <div id="apMsg" class="small" style="color:var(--bad);min-height:18px;margin-top:6px"></div>
+    <button class="btn green" id="apSave" style="width:100%;margin-top:6px">保存</button>
+    <button class="btn ghost" id="apCancel" style="width:100%;margin-top:8px">取消</button>
+  </div>`;
+  openModal(html);
+  const save=()=>{
+    const o=(document.getElementById("apOld").value||"").trim();
+    const n=(document.getElementById("apNew").value||"").trim();
+    const c=(document.getElementById("apCfm").value||"").trim();
+    const msg=document.getElementById("apMsg");
+    if(!o){ msg.textContent="请输入当前密码"; return; }
+    if(!n){ msg.textContent="请输入新密码"; return; }
+    if(n!==c){ msg.textContent="两次输入不一致"; return; }
+    setAdminPwdRemote(o,n).then(r=>{
+      if(r.ok){ ADMIN_PWD=n; try{sessionStorage.setItem("wh_admin_ok","1");}catch(e){} closeModal(); toast("✅ 管理密码已更新"); }
+      else{ msg.textContent="❌ 修改失败："+(r.status||r.err||"当前密码可能错误"); }
+    });
+  };
+  document.getElementById("apSave").onclick=save;
+  document.getElementById("apCancel").onclick=closeModal;
+  setTimeout(()=>{const i=document.getElementById("apOld");if(i)i.focus();},60);
 }
 
 /* 学生端：浏览 / 订阅 云端共用词库 */
@@ -2284,16 +2360,95 @@ function lev(a,b){a=a.toLowerCase();b=b.toLowerCase();const m=a.length,n=b.lengt
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 /* ============ 顶部统计 ============ */
+/* 当前书本学习进度：100% 才算“过关”（单词掌握度达到 100 视为通关） */
+function currentBookProgress(){
+  const bk=LEARNING_BOOK;
+  let ws;
+  if(!bk || bk==="全部" || bk==="all") ws=WORDS.slice();
+  else ws=WORDS.filter(w=>(w.book||"自己添加")===bk);
+  const total=ws.length;
+  const mastered=ws.filter(w=>w.mastery>=100).length;
+  const pct=total?Math.round(mastered/total*100):0;
+  const name=(bk && bk!=="全部" && bk!=="all")?bk:"全部";
+  return {pct,mastered,total,name};
+}
 function renderStats(){
   const total=WORDS.length;
   const due=WORDS.filter(dueIn).length;
   const learned=WORDS.filter(w=>w.reviewCount>0).length;
-  const avg=total?Math.round(WORDS.reduce((s,w)=>s+w.mastery,0)/total):0;
+  const p=currentBookProgress();
   document.getElementById("statbar").innerHTML=
-    stat(total,"词库总数")+statClick(due,"待复习 · 去练","startDue()")+stat(learned,"已练过")+stat(avg+"%","平均掌握")+stat(STREAK.count,"连续天数");
+    stat(total,"词库总数")+statClick(due,"待复习 · 去练","startDue()")+stat(learned,"已练过")+statProg(p)+statClick(STREAK.count,"连续天数","openStreakCalendar()");
 }
 function stat(n,l){return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 function statClick(n,l,fn){return `<div class="stat click" onclick="${fn}"><div class="n">${n}</div><div class="l">${l} ›</div></div>`;}
+function statProg(p){return `<div class="stat"><div class="n">${p.pct}%</div><div class="l">当前书本进度</div><div class="ls">已掌握 ${p.mastered}/${p.total}</div></div>`;}
+
+/* ============ 连续天数：可点击日历 + 当日学习报告 ============ */
+let calMonth=0;
+function dayStudyInfo(key){
+  let cnt=0,know=0,fuzzy=0,no=0,words=[];
+  WORDS.forEach(w=>w.history.forEach(h=>{
+    if(h.act==="review" && dkey(h.t)===key){
+      cnt++;
+      if(h.res==="know")know++; else if(h.res==="fuzzy")fuzzy++; else no++;
+      if(words.length<30 && !words.includes(w.term)) words.push(w.term);
+    }
+  }));
+  return {cnt,know,fuzzy,no,words};
+}
+function openStreakCalendar(){
+  const t=new Date();
+  calMonth=t.getFullYear()*12+t.getMonth();
+  renderCalModal();
+}
+function renderCalModal(){
+  const y=Math.floor(calMonth/12), m=calMonth%12;
+  const t=new Date(); const tkey=t.getFullYear()+"-"+(t.getMonth()+1)+"-"+t.getDate();
+  const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; // 周一为一周开始
+  const d=new Date(y,m,1-startDow);
+  const wdays=["一","二","三","四","五","六","日"];
+  let html=`<div class="card" style="padding:16px;max-width:420px;max-height:90vh;overflow:auto">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+      <button class="btn ghost" onclick="calStep(-1)" style="padding:6px 14px">‹</button>
+      <b>${y}年${m+1}月</b>
+      <button class="btn ghost" onclick="calStep(1)" style="padding:6px 14px">›</button>
+    </div>
+    <div class="cal-heat">
+      ${wdays.map(w=>`<div class="d" style="cursor:default;color:#9aa3b0;font-weight:700">${w}</div>`).join("")}`;
+  let grid="";
+  for(let i=0;i<42;i++){
+    const key=d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+    const info=dayStudyInfo(key);
+    const inMonth=d.getMonth()===m;
+    const isToday=key===tkey;
+    let cls="d";
+    if(info.cnt>0) cls+=" studied";
+    else if(inMonth) cls+=" nostudy";
+    if(!inMonth) cls+=" out";
+    if(isToday) cls+=" today";
+    grid+=`<div class="${cls}" onclick="calDay('${key}')">${d.getDate()}${info.cnt>0?`<span class="dot"></span>`:""}</div>`;
+    d.setDate(d.getDate()+1);
+  }
+  html+=grid+`</div>
+    <div class="cal-legend">
+      <span><i style="background:linear-gradient(135deg,var(--accent),var(--accent2))"></i>学过</span>
+      <span><i style="background:#ffe3e6"></i>未学</span>
+      <span><i style="background:#fff;outline:2px solid #ffd166"></i>今天</span>
+    </div>
+    <div id="calReport" class="info" style="margin-top:10px;display:none"></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button></div>
+  </div>`;
+  openModal(html);
+}
+function calStep(dir){ calMonth+=dir; renderCalModal(); }
+function calDay(key){
+  const info=dayStudyInfo(key);
+  const el=document.getElementById("calReport"); if(!el) return;
+  el.style.display="block";
+  if(info.cnt===0){ el.innerHTML=`${esc(key)}：这天没有学习记录 🌙`; return; }
+  el.innerHTML=`<b>${esc(key)} 学习报告</b><br>复习 ${info.cnt} 次 · 认识 ${info.know} · 模糊 ${info.fuzzy} · 不认识 ${info.no}<br>所学单词：${(info.words.slice(0,20).map(esc).join("、")||"—")}${info.words.length>20?"…":""}`;
+}
 
 /* ============ 标签页 ============ */
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
@@ -2997,29 +3152,63 @@ function listenCard(w){
 }
 
 /* ============ 词库 ============ */
-let libBook="全部", libBooksArr=["全部"];
+let libView="books", libSort="default", libExpanded=false;
+function gradColor(m){ if(m<30)return "#ff5d6c"; if(m<60)return "#f5a623"; if(m<85)return "#5b8cff"; return "#23c08a"; }
+function bookProgress(book){
+  const ws=WORDS.filter(w=>(w.book||"自己添加")===book);
+  const avg=ws.length?Math.round(ws.reduce((s,w)=>s+w.mastery,0)/ws.length):0;
+  return {n:ws.length, avg};
+}
 function renderLib(){
   const q=(document.getElementById("libSearch").value||"").toLowerCase();
-  libBooksArr=["全部"].concat(Array.from(new Set(WORDS.map(w=>w.book||"自己添加"))));
-  const bb=document.getElementById("libBooks");
-  if(bb) bb.innerHTML=libBooksArr.map((b,i)=>`<button class="bk-tab ${b===libBook?'on':''}" onclick="libSetBook(${i})">${esc(b)}</button>`).join("");
-  const list=WORDS.filter(w=>{
-    if(libBook!=="全部" && (w.book||"自己添加")!==libBook) return false;
-    return (w.term+" "+w.mean).toLowerCase().includes(q);
-  });
-  document.getElementById("libCount").textContent=WORDS.length;
   const el=document.getElementById("libList");
-  if(!list.length){el.innerHTML=`<div class="muted center" style="padding:20px">${libBook==="全部"?"没有匹配的单词":"这本书里还没有词"}</div>`;return;}
-  el.innerHTML=list.map(w=>`
+  const bb=document.getElementById("libBooks");
+  if(!el) return;
+  document.getElementById("libCount").textContent=WORDS.length;
+
+  /* —— 书本列表视图 —— */
+  if(libView==="books"){
+    let stats=Array.from(new Set(WORDS.map(w=>w.book||"自己添加"))).map(b=>{const p=bookProgress(b);return {name:b,n:p.n,avg:p.avg};});
+    if(q) stats=stats.filter(s=>s.name.toLowerCase().includes(q));
+    if(!stats.length){ if(bb)bb.innerHTML=""; el.innerHTML=`<div class="muted center" style="padding:20px">还没有任何书本，去「➕ 添加」加词吧</div>`; return; }
+    if(libSort==="mastery") stats.sort((a,b)=>b.avg-a.avg);
+    else stats.sort((a,b)=>b.n-a.n);
+    if(bb) bb.innerHTML=`<button class="bk-tab on" onclick="libSetView('books')">📚 全部书本</button>`;
+    el.innerHTML=`<div class="lib-sort">
+        <button class="chip${libSort==='default'?' on':''}" onclick="libSetSort('default')">默认排序</button>
+        <button class="chip${libSort==='mastery'?' on':''}" onclick="libSetSort('mastery')">掌握度排序</button>
+      </div>`+
+      stats.map(s=>{
+        const col=gradColor(s.avg);
+        return `<div class="lib-book" onclick="libOpenBook('${esc(s.name)}')">
+          <div class="bb-prog" style="--pp:${s.avg};--pcol:${col}"><div class="bb-txt">${s.avg}%</div></div>
+          <div class="bb-name">${esc(s.name)}</div>
+          <div class="bb-meta">${s.n} 词</div>
+        </div>`;
+      }).join("");
+    return;
+  }
+
+  /* —— 单本书单词视图（前 5 个 + 更多） —— */
+  const ws=WORDS.filter(w=>(w.book||"自己添加")===libView);
+  const list=ws.filter(w=>(w.term+" "+w.mean).toLowerCase().includes(q));
+  if(bb) bb.innerHTML=`<button class="bk-tab" onclick="libSetView('books')">‹ 全部书本</button><button class="bk-tab on">${esc(libView)}</button>`;
+  if(!list.length){ el.innerHTML=`<div class="muted center" style="padding:20px">这本书里还没有词</div>`; return; }
+  const shown=libExpanded?list:list.slice(0,5);
+  el.innerHTML=shown.map(w=>`
     <div class="libitem" onclick="showWord('${w.id}')">
       <div class="libmain">
         <div class="w${w.term.length>15?' long':''}">${esc(w.term)}</div>
         <div class="m">${esc(w.mean)}</div>
       </div>
       <span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span>
-    </div>`).join("");
+    </div>`).join("")+
+    (list.length>5 && !libExpanded?`<div class="more-row"><button class="more-btn" onclick="libExpand()">… 更多（共 ${list.length} 个）</button></div>`:"");
 }
-function libSetBook(i){ libBook=libBooksArr[i]; renderLib(); }
+function libOpenBook(b){ libView=b; libExpanded=false; renderLib(); }
+function libSetView(v){ libView=v; libExpanded=false; renderLib(); }
+function libSetSort(s){ libSort=s; renderLib(); }
+function libExpand(){ libExpanded=true; renderLib(); }
 document.getElementById("libSearch").oninput=renderLib;
 function showWord(id){
   const w=WORDS.find(x=>x.id===id);if(!w)return;
@@ -3261,11 +3450,23 @@ function renderStatsPanel(){
 /* ============ 家长监控：学习情况统计分析 ============ */
 function dkey(ts){return fmt(ts).slice(0,10);}
 function pstat(n,l){return `<div class="pstat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
+let weakMoreOpen=false;
+function toggleWeakMore(){
+  weakMoreOpen=!weakMoreOpen;
+  document.querySelectorAll('#parentPanel .weakitem').forEach(el=>{
+    const i=+el.getAttribute('data-idx');
+    if(i>=5) el.style.display = weakMoreOpen?'':'none';
+  });
+  const btn=document.getElementById('weakMoreBtn');
+  const total=document.querySelectorAll('#parentPanel .weakitem').length;
+  if(btn) btn.textContent = weakMoreOpen? '收起 ▲' : ('… 更多（共 '+total+' 个）');
+}
 function renderParentPanel(){
   ensurePack();
   const total=WORDS.length;
   const learned=WORDS.filter(w=>w.reviewCount>0).length;
   const avg=total?Math.round(WORDS.reduce((s,w)=>s+w.mastery,0)/total):0;
+  const p=currentBookProgress();
   const totalReviews=WORDS.reduce((s,w)=>s+w.reviewCount,0);
   const days=new Set();
   let knowN=0,fuzzyN=0,noN=0;
@@ -3282,13 +3483,19 @@ function renderParentPanel(){
   for(let i=6;i>=0;i--){const d=new Date();const dd=new Date(d.getTime()-i*86400000);const key=dd.getFullYear()+"-"+(dd.getMonth()+1)+"-"+dd.getDate();const cnt=WORDS.reduce((s,w)=>s+w.history.filter(h=>h.act==="review"&&dkey(h.t)===key).length,0);act.push({key,label:(dd.getMonth()+1)+"/"+dd.getDate(),cnt});}
   const maxAct=Math.max(1,...act.map(a=>a.cnt));
 
-  /* 今日词包 + 四种方式进度 */
+  /* 今日词包 + 四种方式进度（四宫格） */
   const words=PACK?PACK.ids.map(id=>WORDS.find(w=>w.id===id)).filter(Boolean):[];
-  const modeRows=MODE_KEYS.map(m=>{
+  const modeGrid=`<div class="mgrid">`+MODE_KEYS.map(m=>{
     const pass=mPassN(m),t=words.length,all=mAllPass(m),prog=t?Math.round(pass/t*100):0;
     const unfam=mUnfam(m);
-    return `<div class="modeRow"><div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between"><b>${MODE_ICON[m]} ${MODE_NAMES[m]}</b><span class="pill ${all?'g':'o'}">${all?'✅ 全对通关':'正确 '+pass+'/'+t}</span></div><div class="prog"><i style="width:${prog}%"></i></div>${(!all&&unfam.length)?`<div class="unfam-line">🔴 还不熟练：${unfam.map(w=>esc(w.term)).join("、")}</div>`:""}</div></div>`;
-  }).join("");
+    return `<div class="mcell ${all?'pass':''}">
+      <div class="mi">${MODE_ICON[m]}</div>
+      <div class="mn">${pass}/${t}</div>
+      <div class="ml">${MODE_NAMES[m]}</div>
+      <div class="mbar"><i style="width:${prog}%"></i></div>
+      ${all?`<div class="ml" style="color:var(--good);margin-top:4px">✅ 全对通关</div>`:(unfam.length?`<div class="ml" style="color:var(--bad);margin-top:4px">🔴 ${unfam.length}个不熟</div>`:"")}
+    </div>`;
+  }).join("")+`</div>`;
 
   /* 薄弱词（掌握度 < 60%） */
   const weak=WORDS.filter(w=>w.mastery<60).sort((a,b)=>a.mastery-b.mastery).slice(0,12);
@@ -3305,19 +3512,20 @@ function renderParentPanel(){
     ${pstat(STREAK.count,"连续学习·天")}
     ${pstat(days.size,"累计学习·天")}
     ${pstat(totalReviews,"总复习次数")}
-    ${pstat(avg+"%","平均掌握度")}
+    ${pstat(p.pct+"%","当前书本进度")}
+    ${pstat(p.mastered+"/"+p.total,"已掌握单词量")}
     ${pstat(todayReviews,"今日复习·次")}
     ${pstat(acc+"%","今日正确率")}
   </div>`;
 
   const chart=`<div class="actchart">${act.map(a=>`<div class="col"><div class="cnt">${a.cnt?a.cnt:""}</div><div class="bar ${a.cnt?"":"zero"}" style="height:${Math.max(3,a.cnt/maxAct*92)}px"></div><div class="lab">${a.label}</div></div>`).join("")}</div>`;
 
-  const weakHtml=weak.length?weak.map(w=>`<div class="weakitem"><div class="w">${esc(w.term)} <span class="muted small">${esc(w.phon||"")}</span></div><div class="m">${esc(w.mean)}</div><span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span></div>`).join(""):`<div class="muted small">暂时没有薄弱词，掌握得很好 👍</div>`;
+  const weakHtml=(weak.length?weak.map((w,i)=>`<div class="weakitem click" data-idx="${i}" style="display:${i<5?'':'none'}" onclick="showWord('${w.id}')"><div class="w">${esc(w.term)} <span class="muted small">${esc(w.phon||"")}</span></div><div class="m">${esc(w.mean)}</div><span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span></div>`).join(""):`<div class="muted small">暂时没有薄弱词，掌握得很好 👍</div>`)+(weak.length>5?`<div class="more-row"><button id="weakMoreBtn" class="more-btn" onclick="toggleWeakMore()">… 更多（共 ${weak.length} 个）</button></div>`:"");
 
   const report=`【陈锋本周单词学习报告】
 累计学习：${days.size} 天（连续 ${STREAK.count} 天）
 总复习次数：${totalReviews} 次（历史答对率 ${repRatio}%）
-平均掌握度：${avg}%
+当前书本进度：${p.pct}%（已掌握 ${p.mastered}/${p.total}）
 今日复习：${todayReviews} 次（正确率 ${acc}%）
 今日新词学习：${words.map(w=>w.term).join("、")||"—"}
 薄弱词（<60%）：${weak.length?weak.map(w=>w.term+"("+w.mastery+"%)").join("、"):"无"}
@@ -3333,25 +3541,28 @@ function renderParentPanel(){
     </div>
     <div class="card"><h2>📌 今日新词学习 · 各方式进度</h2>
       <div class="packwords" style="margin-top:6px">${words.map(w=>`<span class="pw">${esc(w.term)}</span>`).join("")}</div>
-      ${modeRows}
+      ${modeGrid}
     </div>
     <div class="card"><h2>⚠️ 薄弱词清单（家长重点陪练）</h2>${weakHtml}</div>
-    <div class="card"><h2>🔐 家长密码设置</h2>
-      <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
-        <input id="oldPwd" type="password" style="flex:1;padding:8px;border:2px solid var(--line);border-radius:10px" placeholder="当前密码">
+    <div class="card" style="padding:0;overflow:hidden"><div class="acc">
+      <div class="acc-h" onclick="toggleAcc(this)">🔐 家长密码设置 <span class="acc-ar">›</span></div>
+      <div class="acc-b">
+        <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+          <input id="oldPwd" type="password" style="flex:1;padding:8px;border:2px solid var(--line);border-radius:10px" placeholder="当前密码">
+        </div>
+        <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+          <input id="newPwd" type="password" style="flex:1;padding:8px;border:2px solid var(--line);border-radius:10px" placeholder="设置新的家长密码">
+        </div>
+        <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+          <input id="cfmPwd" type="password" style="flex:1;padding:8px;border:2px solid var(--line);border-radius:10px" placeholder="再次输入新密码">
+        </div>
+        <div class="row" style="gap:8px;align-items:center">
+          <button class="btn green" onclick="setParentPwd()">保存</button>
+          <span id="pwdSetMsg" class="small" style="color:var(--muted)"></span>
+        </div>
+        <div class="addline">删除「在学 / 已学」单词时需要输入此密码。<b>首次使用请直接设置新密码（无需填写当前密码）</b>；之后修改须先验证旧密码并二次确认，防止他人随意篡改。</div>
       </div>
-      <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
-        <input id="newPwd" type="password" style="flex:1;padding:8px;border:2px solid var(--line);border-radius:10px" placeholder="设置新的家长密码">
-      </div>
-      <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
-        <input id="cfmPwd" type="password" style="flex:1;padding:8px;border:2px solid var(--line);border-radius:10px" placeholder="再次输入新密码">
-      </div>
-      <div class="row" style="gap:8px;align-items:center">
-        <button class="btn green" onclick="setParentPwd()">保存</button>
-        <span id="pwdSetMsg" class="small" style="color:var(--muted)"></span>
-      </div>
-      <div class="addline">删除「在学 / 已学」单词时需要输入此密码。<b>首次使用请直接设置新密码（无需填写当前密码）</b>；之后修改须先验证旧密码并二次确认，防止他人随意篡改。</div>
-    </div>
+    </div></div>
     <div class="card center">
       <button class="btn" style="width:100%" onclick="copyParentReport()">📋 复制本周学习报告</button>
       <div class="addline">把报告发给家长群或老师，随时掌握孩子进度。</div>
@@ -3383,6 +3594,28 @@ function fallbackCopy(t){const ta=document.createElement("textarea");ta.value=t;
 /* ============ 弹窗 & 导入导出 ============ */
 function openModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("show");}
 function closeModal(){document.getElementById("modalBg").classList.remove("show");}
+/* 自定义确认弹窗（替代浏览器 confirm()，避免手机 WebView 中 confirm 被直接驳回导致“点击无反应”） */
+function confirmDialog(title,msg,onYes){
+  const html=`<div class="card" style="padding:18px;max-width:320px">
+    <h3 style="margin:0 0 8px">${esc(title||"请确认")}</h3>
+    <p class="muted small" style="font-size:13px;margin:0 0 14px;white-space:pre-line">${esc(msg||"")}</p>
+    <div class="row" style="gap:10px">
+      <button class="btn ghost" style="flex:1" onclick="closeModal()">取消</button>
+      <button class="btn" id="cfmYes" style="flex:1;background:#e0524d;color:#fff">确认</button>
+    </div>
+  </div>`;
+  openModal(html);
+  const cb=document.getElementById("cfmYes");
+  if(cb)cb.onclick=()=>{ const fn=onYes; closeModal(); if(typeof fn==="function") fn(); };
+}
+/* 手风琴折叠：点击标题展开/收起详情 */
+function toggleAcc(h){
+  const item=h.parentElement;
+  const open=item.classList.contains("open");
+  // 默认手风琴行为：展开一个时收起同级其它（如需多个同时展开，去掉下面两行）
+  if(!open){ const root=item.parentElement; if(root&&root.classList.contains("acc")) root.querySelectorAll(".acc-h.open").forEach(x=>x.classList.remove("open")); }
+  h.classList.toggle("open");
+}
 document.getElementById("modalBg").onclick=e=>{if(e.target.id==="modalBg")closeModal();};
 
 document.getElementById("exportBtn").onclick=()=>{
@@ -4066,7 +4299,7 @@ function openParentWordMgr(){
       <button class="btn ghost" id="pmSelectAll" style="flex:1">全选</button>
       <button class="btn ghost" id="pmSelectNone" style="flex:1">取消全选</button>
     </div>
-    <div style="display:flex;gap:6px;margin-top:8px">
+    <div class="modal-actions" style="display:flex;gap:6px;margin-top:8px;border-top:1px solid var(--line);padding-top:10px">
       <button class="btn ghost" id="pmCancel" style="flex:1">取消</button>
       <button class="btn" id="pmDelete" style="flex:1;background:#e0524d;color:#fff;display:none">确认删除</button>
     </div>
@@ -4127,17 +4360,17 @@ function openParentWordMgr(){
   document.getElementById("pmSelectAll").onclick=()=>{ shownWords().forEach(w=>selIds.add(w.id)); pmRender(); };
   document.getElementById("pmSelectNone").onclick=()=>{ shownWords().forEach(w=>selIds.delete(w.id)); pmRender(); };
   document.getElementById("pmCancel").onclick=closeModal;
-  document.getElementById("pmDelete").onclick=async()=>{
+  document.getElementById("pmDelete").onclick=()=>{
     if(!selIds.size){ toast("未选中任何单词"); return; }
     const n=selIds.size;
-    if(!confirm("确定删除选中的 "+n+" 个单词？")) return;
-    if(!confirm("⚠️ 再次确认：删除后不可恢复，所有设备同步生效。确定？")) return;
-    const delIds=[...selIds];
-    WORDS=WORDS.filter(w=>!selIds.has(w.id));
-    selIds.clear();
-    save(); renderLib();
-    await cloudUploadWithDeleted(delIds);
-    closeModal(); renderStats(); toast("已删除 "+n+" 个单词");
+    confirmDialog("确认删除","确定删除选中的 "+n+" 个单词？\n删除后不可恢复，所有设备同步生效。", async ()=>{
+      const delIds=[...selIds];
+      WORDS=WORDS.filter(w=>!selIds.has(w.id));
+      selIds.clear();
+      save(); renderLib();
+      await cloudUploadWithDeleted(delIds);
+      closeModal(); renderStats(); toast("已删除 "+n+" 个单词");
+    });
   };
   document.getElementById("pmImport").onclick=()=>{
     const lines=(document.getElementById("pmBatch").value||"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
@@ -4228,6 +4461,9 @@ function kidPanelHTML(name, words, streak, pack){
   const total=words.length;
   const learned=words.filter(w=>w.reviewCount>0).length;
   const avg=total?Math.round(words.reduce((s,w)=>s+(w.mastery||0),0)/total):0;
+  const bk=LEARNING_BOOK; let bws; if(!bk||bk==="全部"||bk==="all")bws=words.slice(); else bws=words.filter(w=>(w.book||"自己添加")===bk);
+  const bTotal=bws.length, bMastered=bws.filter(w=>(w.mastery||0)>=100).length;
+  const p={pct:bTotal?Math.round(bMastered/bTotal*100):0,mastered:bMastered,total:bTotal};
   const totalReviews=words.reduce((s,w)=>s+(w.reviewCount||0),0);
   const days=new Set();
   let knowN=0,fuzzyN=0,noN=0;
@@ -4242,12 +4478,18 @@ function kidPanelHTML(name, words, streak, pack){
   for(let i=6;i>=0;i--){const d=new Date();const dd=new Date(d.getTime()-i*86400000);const key=dd.getFullYear()+"-"+(dd.getMonth()+1)+"-"+dd.getDate();const cnt=words.reduce((s,w)=>s+(w.history||[]).filter(h=>h.act==="review"&&dkey(h.t)===key).length,0);act.push({key,label:(dd.getMonth()+1)+"/"+dd.getDate(),cnt});}
   const maxAct=Math.max(1,...act.map(a=>a.cnt));
   const wordsArr=pack?pack.ids.map(id=>words.find(w=>w.id===id)).filter(Boolean):[];
-  const modeRows=MODE_KEYS.map(m=>{
+  const modeGrid=`<div class="mgrid">`+MODE_KEYS.map(m=>{
     const pass=pack?pack.ids.filter(id=>pack.perMode[m].done[id]==="know").length:0;
-    const t=wordsArr.length, all=t>0 && pack.ids.every(id=>pack.perMode[m].done[id]==="know"), prog=t?Math.round(pass/t*100):0;
+    const t=wordsArr.length, all=t>0 && pack && pack.ids.every(id=>pack.perMode[m].done[id]==="know"), prog=t?Math.round(pass/t*100):0;
     const unfam=pack?pack.ids.map(id=>words.find(w=>w.id===id)).filter(w=>{const r=w&&pack.perMode[m].done[w.id];return r&&r!=="know";}):[];
-    return `<div class="modeRow"><div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between"><b>${MODE_ICON[m]} ${MODE_NAMES[m]}</b><span class="pill ${all?'g':'o'}">${all?'✅ 全对通关':'正确 '+pass+'/'+t}</span></div><div class="prog"><i style="width:${prog}%"></i></div>${(!all&&unfam.length)?`<div class="unfam-line">🔴 还不熟练：${unfam.map(w=>esc(w.term)).join("、")}</div>`:""}</div></div>`;
-  }).join("");
+    return `<div class="mcell ${all?'pass':''}">
+      <div class="mi">${MODE_ICON[m]}</div>
+      <div class="mn">${pass}/${t}</div>
+      <div class="ml">${MODE_NAMES[m]}</div>
+      <div class="mbar"><i style="width:${prog}%"></i></div>
+      ${all?`<div class="ml" style="color:var(--good);margin-top:4px">✅ 全对通关</div>`:(unfam.length?`<div class="ml" style="color:var(--bad);margin-top:4px">🔴 ${unfam.length}个不熟</div>`:"")}
+    </div>`;
+  }).join("")+`</div>`;
   const weak=words.filter(w=>(w.mastery||0)<60).sort((a,b)=>(a.mastery||0)-(b.mastery||0)).slice(0,12);
   const repRatio=totalReviews?Math.round((knowN/totalReviews)*100):0;
   let suggest="";
@@ -4260,12 +4502,13 @@ function kidPanelHTML(name, words, streak, pack){
     ${pstat(streak.count,"连续学习·天")}
     ${pstat(days.size,"累计学习·天")}
     ${pstat(totalReviews,"总复习次数")}
-    ${pstat(avg+"%","平均掌握度")}
+    ${pstat(p.pct+"%","当前书本进度")}
+    ${pstat(p.mastered+"/"+p.total,"已掌握单词量")}
     ${pstat(todayReviews,"今日复习·次")}
     ${pstat(acc+"%","今日正确率")}
   </div>`;
   const chart=`<div class="actchart">${act.map(a=>`<div class="col"><div class="cnt">${a.cnt?a.cnt:""}</div><div class="bar ${a.cnt?"":"zero"}" style="height:${Math.max(3,a.cnt/maxAct*92)}px"></div><div class="lab">${a.label}</div></div>`).join("")}</div>`;
-  const weakHtml=weak.length?weak.map(w=>`<div class="weakitem"><div class="w">${esc(w.term)} <span class="muted small">${esc(w.phon||"")}</span></div><div class="m">${esc(w.mean)}</div><span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span></div>`).join(""):`<div class="muted small">暂时没有薄弱词，掌握得很好 👍</div>`;
+  const weakHtml=weak.length?weak.map(w=>`<div class="weakitem click" onclick="if(window.showWord)showWord('${w.id}')"><div class="w">${esc(w.term)} <span class="muted small">${esc(w.phon||"")}</span></div><div class="m">${esc(w.mean)}</div><span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span></div>`).join(""):`<div class="muted small">暂时没有薄弱词，掌握得很好 👍</div>`;
   return `<div class="kid-detail">
     <div class="card"><h2>👪 ${esc(name)} · 学习情况统计</h2>
       <div class="summary">${esc(suggest)}</div>
@@ -4276,7 +4519,7 @@ function kidPanelHTML(name, words, streak, pack){
     </div>
     <div class="card"><h2>📌 今日新词学习 · 各方式进度</h2>
       <div class="packwords" style="margin-top:6px">${wordsArr.length?wordsArr.map(w=>`<span class="pw">${esc(w.term)}</span>`).join(""):`<span class="muted small">今日还没有新词包</span>`}</div>
-      ${modeRows}
+      ${modeGrid}
     </div>
     <div class="card"><h2>⚠️ 薄弱词清单（家长重点陪练）</h2>${weakHtml}</div>
   </div>`;
@@ -4354,14 +4597,18 @@ async function onlineLookup(term){
 }
 function lookupHtml(r){
   if(r.err)return `<div class="info" style="color:var(--bad)">⚠️ ${esc(r.err)}</div>`;
-  let h=`<h3>${esc(r.term)} ${r.phon?`<span class="muted small">${esc(r.phon)}</span>`:""}</h3>`;
-  if(r.zh)h+=`<div class="info"><span class="ol-tag">中文</span>${esc(r.zh)}</div>`;
+  let h=`<div style="font-size:22px;font-weight:900;color:var(--accent);display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(r.term)} ${r.phon?`<span class="muted small" style="font-weight:400;color:#8a5cff;font-size:15px">${esc(r.phon)}</span>`:""} <button class="spk" onclick="speak('${esc(r.term)}')">🔊</button></div>`;
+  if(r.zh)h+=`<div class="acc" style="margin-top:10px">
+    <div class="acc-h" onclick="toggleAcc(this)"><span>🌐 中文翻译</span><i class="acc-ar">›</i></div>
+    <div class="acc-b"><span class="ol-tag">中文</span>${esc(r.zh)}</div></div>`;
   if(r.posDefs.length){
-    h+=`<div class="info"><b>英文释义 &amp; 例句：</b><ul>`;
+    h+=`<div class="acc" style="margin-top:8px">
+      <div class="acc-h" onclick="toggleAcc(this)"><span>📖 英文释义 &amp; 例句</span><i class="acc-ar">›</i></div>
+      <div class="acc-b"><ul style="margin:0;padding-left:18px">`;
     r.posDefs.forEach(d=>{h+=`<li><b>${esc(d.pos)}</b> ${esc(d.def)}${d.ex?` <span class="muted">（例：${esc(d.ex)}）</span>`:""}</li>`;});
-    h+=`</ul></div>`;
+    h+=`</ul></div></div>`;
   }
-  if(!r.zh&&!r.posDefs.length)h+=`<div class="muted small">只查到部分信息，网络可能不完整。</div>`;
+  if(!r.zh&&!r.posDefs.length)h+=`<div class="muted small" style="margin-top:8px">只查到部分信息，网络可能不完整。</div>`;
   return h;
 }
 /* 翻译整句中文（用于例句中文释义缺失时自动补全），返回带来源 */
@@ -4441,12 +4688,12 @@ if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.s
 load();ensurePack();renderStats();renderPackUI();applyBkUI();applyAccentUI();ensureLogin();
 /* 安装地址自动显示当前托管网址 + 动态二维码 + 复制按钮（换任何托管都不用手改代码） */
 (function(){
+  const installUrlFull=(location.origin+"/wordhero/").replace(/([^:\/])\/\//g,"$1/");
   const iu=document.getElementById("installUrl");
-  if(iu)iu.textContent=location.origin;
-  const qr=document.querySelector("#help img");
-  if(qr){qr.src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data="+encodeURIComponent(location.origin);qr.onerror=()=>{qr.style.display="none";};}
+  if(iu)iu.textContent=installUrlFull;
+  /* 二维码为离线静态图（构建时生成，指向安装地址），换托管请用脚本重新生成 */
   const cb=document.getElementById("copyUrlBtn");
-  if(cb)cb.onclick=()=>{if(navigator.clipboard){navigator.clipboard.writeText(location.origin).then(()=>toast("已复制安装地址")).catch(()=>{});}};
+  if(cb)cb.onclick=()=>{if(navigator.clipboard){navigator.clipboard.writeText(installUrlFull).then(()=>toast("已复制安装地址")).catch(()=>{});}};
 })();
 /* 初始化"添加词"书本选择器：默认跟随当前学习书本 */
 addBookState.picked=(LEARNING_BOOK && LEARNING_BOOK!=="全部")?LEARNING_BOOK:"自己添加";
