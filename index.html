@@ -338,18 +338,16 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   <section class="panel" id="lib">
     <div class="card">
       <h2>🔍 联网查词 / 翻译</h2>
-      <p class="small muted">输入英文单词，联网核查它的音标、词性、英文释义、例句，并给出中文翻译（数据源：免费公开词典 + 翻译接口）。需要联网。</p>
+      <p class="small muted">输入英文单词，联网核查它的音标并给出中文翻译（数据源：免费公开词典 + 翻译接口）。需要联网。</p>
       <div class="row">
         <input id="olInput" placeholder="输入英文单词，如 review" style="flex:1">
         <button class="btn" id="olBtn">查词</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button class="btn ghost" id="olExample" style="font-size:13px">📌 看例子：查 review</button>
       </div>
       <div id="olStatus" class="small muted" style="margin-top:8px"></div>
     </div>
     <div class="card">
       <h2>我的词库 (<span id="libCount">0</span>)</h2>
+      <button class="btn" id="addCloudLibBtn" style="width:100%;margin-bottom:10px;background:#eaf3ff;color:var(--accent)">☁ 添加云词库</button>
       <input class="search" id="libSearch" placeholder="🔍 搜单词 / 释义 / 书本…">
       <div id="libBooks" class="lib-books"></div>
       <div id="libList"></div>
@@ -377,7 +375,7 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
         <button class="btn green" id="addOneBtn" style="flex:1">✓ 添加这一个</button>
       </div>
       <div class="row" style="margin-top:8px">
-        <button class="btn ghost" id="awLookupBtn" style="flex:1;font-size:13px">🔍 先联网查一下（自动补全音标 / 例句）</button>
+        <button class="btn ghost" id="awLookupBtn" style="flex:1;font-size:13px">🔍 先联网查一下（自动补全音标 / 中文释义）</button>
       </div>
       <div class="addline">只需填「单词 + 中文释义」即可。重复的词会自动提示你之前背过的时间，不会重复添加。音标和例句留空时会自动联网补全。</div>
     </div>
@@ -462,7 +460,7 @@ communicate | 交流；沟通"></textarea>
         <div class="acc-h" onclick="toggleAcc(this)"><span>🔊 发音</span><i class="acc-ar">›</i></div>
         <div class="acc-b">点 🔊 按钮听标准英语发音，单词和例句都能读。电脑 / 带英文嗓音的设备会用系统朗读（可离线）；<b>手机 App 会自动改用在线音频发音（需联网）</b>，多个音源自动切换，联网即可正常出声。可在下方“🔊 发音设置”里切换美式 / 英式口音。</div>
         <div class="acc-h" onclick="toggleAcc(this)"><span>🌐 联网查词 / 翻译</span><i class="acc-ar">›</i></div>
-        <div class="acc-b">在“词库”页顶部输入单词点“查词”，会联网给出音标、词性、英文释义、例句和<b>中文翻译</b>；点“📌 看例子：查 review”能直接看一个完整示例。添加新词时也可以先“联网查一下”让系统自动帮你填好释义/音标/例句。</div>
+        <div class="acc-b">在“词库”页顶部输入单词点“查词”，会联网给出<b>音标</b>和<b>中文翻译</b>。添加新词时也可以先“联网查一下”让系统自动帮你填好中文释义和音标。</div>
         <div class="acc-h" onclick="toggleAcc(this)"><span>🔒 数据安全</span><i class="acc-ar">›</i></div>
         <div class="acc-b">所有单词只存在你这台设备的浏览器里。想换设备？用“设置”里的导出/导入把词库带走。</div>
       </div>
@@ -2270,10 +2268,10 @@ function adminChangePwd(){
 async function openCloudLibSubscribe(){
   const html=`<div class="card" style="padding:16px;max-width:440px">
     <div class="row" style="justify-content:space-between;align-items:center">
-      <h3 style="margin:0">☁ 云端共用词库</h3>
+      <h3 style="margin:0">☁ 添加云词库</h3>
       <button class="btn ghost" onclick="closeModal()" style="padding:4px 10px">关闭</button>
     </div>
-    <p class="muted small" style="font-size:12px;margin:4px 0 8px">订阅后这些词会出现在你的词库里（锁定、随云端更新）。取消订阅则移除。</p>
+    <p class="muted small" style="font-size:12px;margin:4px 0 8px">把云端书本添加到本地即可使用；已添加到本地的，可随时从本地移除（云端不受影响）。</p>
     <div id="clList" class="muted small">加载中…</div>
   </div>`;
   openModal(html);
@@ -2284,17 +2282,17 @@ async function openCloudLibSubscribe(){
   if(!books.length){ el.innerHTML="云端还没有共用词库。需要管理员（陈锋）在「👪 家长 → 云端词库管理」里先创建。"; return; }
   el.innerHTML=books.map(b=>`<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
     <b style="flex:1">📚 ${esc(b.name)}</b><span class="muted small">${(b.words||[]).length}词</span>
-    ${sub.includes(b.name)?`<button class="btn ghost" data-unsub="${esc(b.name)}" style="font-size:12px;color:#e0524d">取消订阅</button>`:`<button class="btn green" data-sub="${esc(b.name)}" style="font-size:12px">订阅</button>`}
+    ${sub.includes(b.name)?`<button class="btn ghost" data-unsub="${esc(b.name)}" style="font-size:12px;color:#e0524d">从本地移除</button>`:`<button class="btn green" data-sub="${esc(b.name)}" style="font-size:12px">添加到本地</button>`}
   </div>`).join("");
   document.querySelectorAll("[data-sub]").forEach(btn=>btn.onclick=async()=>{
     const name=btn.getAttribute("data-sub"); const r=await cloudLibGet();
     const n=subscribeLib(name, r.books||[]); save(); if(typeof cloudUpload==="function") cloudUpload(true);
-    toast("已订阅「"+name+"」+"+n+"词"); openCloudLibSubscribe();
+    toast("已把「"+name+"」添加到本地（共 "+n+" 词）"); openCloudLibSubscribe();
   });
   document.querySelectorAll("[data-unsub]").forEach(btn=>btn.onclick=()=>{
-    const name=btn.getAttribute("data-unsub"); const n=unsubscribeLib(name);
+    const name=btn.getAttribute("data-unsub");     const n=unsubscribeLib(name);
     save(); if(typeof cloudUpload==="function") cloudUpload(true);
-    toast("已取消订阅「"+name+"」移除"+n+"词"); openCloudLibSubscribe();
+    toast("已从本地移除「"+name+"」（"+n+" 词）"); openCloudLibSubscribe();
   });
 }
 
@@ -4245,7 +4243,7 @@ async function pullFullFromCloud(){
 function openBookManager(){
   const html=`<div class="card" style="padding:16px;max-width:420px">
     <h3 style="margin:0 0 6px">📚 我的书本</h3>
-    <button class="btn" id="bmCloud" style="width:100%;margin-bottom:8px;background:#eaf3ff;color:var(--accent)">☁ 浏览 / 订阅云端共用词库</button>
+    <button class="btn" id="bmCloud" style="width:100%;margin-bottom:8px;background:#eaf3ff;color:var(--accent)">☁ 添加云词库</button>
     <p class="muted small" style="font-size:12px;margin:0 0 8px">重命名会立即生效；删除书本会清空该书所有单词（需二次确认）。</p>
     <div id="bmList" style="max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:8px"></div>
     <div style="display:flex;gap:6px;margin-top:6px">
@@ -4633,7 +4631,7 @@ const OL_TRANS="https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=";
 async function onlineLookup(term){
   term=(term||"").trim();
   if(!term)return {err:"请输入单词"};
-  let phon="",posDefs=[],zh="";
+  let phon="",zh="";
   const dP=fetch(OL_DICT+encodeURIComponent(term.toLowerCase()));
   const tP=fetch(OL_TRANS+encodeURIComponent(term));
   const [dR,tR]=await Promise.allSettled([dP,tP]);
@@ -4643,21 +4641,14 @@ async function onlineLookup(term){
       const arr=Array.isArray(data)?data:[];
       if(arr.length){
         phon=arr[0].phonetic||(arr[0].phonetics||[]).map(p=>p.text).filter(Boolean)[0]||"";
-        arr.slice(0,3).forEach(en=>{
-          (en.meanings||[]).slice(0,3).forEach(m=>{
-            const pos=m.partOfSpeech||"";
-            const def=(m.definitions||[])[0];
-            if(def)posDefs.push({pos,def:def.definition,ex:def.example||""});
-          });
-        });
       }
     }catch(e){}
   }
   if(tR.status==="fulfilled"){
     try{const t=await tR.value.json();if(t&&t.responseData)zh=t.responseData.translatedText||"";}catch(e){}
   }
-  if(!phon&&!posDefs.length&&!zh)return {err:"没查到这个词，请检查拼写或网络后重试"};
-  return {term,phon,posDefs,zh};
+  if(!phon&&!zh)return {err:"没查到这个词，请检查拼写或网络后重试"};
+  return {term,phon,zh};
 }
 function lookupHtml(r){
   if(r.err)return `<div class="info" style="color:var(--bad)">⚠️ ${esc(r.err)}</div>`;
@@ -4665,14 +4656,7 @@ function lookupHtml(r){
   if(r.zh)h+=`<div class="acc" style="margin-top:10px">
     <div class="acc-h" onclick="toggleAcc(this)"><span>🌐 中文翻译</span><i class="acc-ar">›</i></div>
     <div class="acc-b"><span class="ol-tag">中文</span>${esc(r.zh)}</div></div>`;
-  if(r.posDefs.length){
-    h+=`<div class="acc" style="margin-top:8px">
-      <div class="acc-h" onclick="toggleAcc(this)"><span>📖 英文释义 &amp; 例句</span><i class="acc-ar">›</i></div>
-      <div class="acc-b"><ul style="margin:0;padding-left:18px">`;
-    r.posDefs.forEach(d=>{h+=`<li><b>${esc(d.pos)}</b> ${esc(d.def)}${d.ex?` <span class="muted">（例：${esc(d.ex)}）</span>`:""}</li>`;});
-    h+=`</ul></div></div>`;
-  }
-  if(!r.zh&&!r.posDefs.length)h+=`<div class="muted small" style="margin-top:8px">只查到部分信息，网络可能不完整。</div>`;
+  if(!r.zh)h+=`<div class="muted small" style="margin-top:8px">只查到音标，没拿到中文翻译，可以再试一次。</div>`;
   return h;
 }
 /* 翻译整句中文（用于例句中文释义缺失时自动补全），返回带来源 */
@@ -4708,7 +4692,6 @@ function showLookup(term,mode){
         <button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button>`;
       document.getElementById("olFillBtn").onclick=()=>{
         if(r.zh)document.getElementById("awMean").value=r.zh;
-        if(r.posDefs[0]){if(!document.getElementById("awMean").value)document.getElementById("awMean").value=r.posDefs[0].def;}
         toast("已填好释义，检查一下再点添加");closeModal();
       };
     }else{
@@ -4718,9 +4701,8 @@ function showLookup(term,mode){
       document.getElementById("olAddBtn").onclick=()=>{
         const book=resolveAddBook();
         if(findExact(term,book)){toast(term+" 在「"+book+"」里已经存在啦");closeModal();return;}
-        const mean=r.zh||(r.posDefs[0]?r.posDefs[0].def:"");
-        const ex=r.posDefs[0]?r.posDefs[0].ex:"";
-        const w=addSingle(term,mean,r.phon,ex);
+        const mean=r.zh||"";
+        const w=addSingle(term,mean,r.phon,"");
         if(w)closeModal();
       };
     }
@@ -4736,7 +4718,7 @@ function showLookup(term,mode){
 function showLookupById(id){const w=WORDS.find(x=>x.id===id);if(w)showLookup(w.term);}
 document.getElementById("olBtn").onclick=()=>{const t=document.getElementById("olInput").value.trim();if(!t){toast("请输入单词");return;}showLookup(t);};
 document.getElementById("olInput").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("olBtn").click();});
-document.getElementById("olExample").onclick=()=>{document.getElementById("olInput").value="review";showLookup("review");};
+document.getElementById("addCloudLibBtn").onclick=openCloudLibSubscribe;
 document.getElementById("awLookupBtn").onclick=()=>{const t=document.getElementById("awTerm").value.trim();if(!t){toast("先在上面输入英文单词");return;}showLookup(t,"fill");};
 
 /* ============ PWA：可安装 + 离线 ============ */
