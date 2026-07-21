@@ -475,7 +475,7 @@ communicate | 交流；沟通"></textarea>
 const KEY="wordhero_v1";
 let WORDS=[];      // 词库
 let STREAK={last:null,count:0}; // 连续天数
-let PARENT_PWD=(function(){try{return localStorage.getItem("wordhero_pwd")||"1234";}catch(e){return "1234";}})(); // 家长密码（删除在学/已学单词时需要）
+let PARENT_PWD=(function(){try{return localStorage.getItem("wordhero_pwd")||"";}catch(e){return "";}})(); // 家长密码（删除在学/已学单词时需要）；未设置则为空，须先到「家长密码设置」设定
 
 /* ============ 全局云端配置（家长/发布者填一次，全员自动生效） ============
    把你的 Supabase 项目 URL 和 anon/public key 填进来，重新部署后：
@@ -1965,42 +1965,232 @@ const LIB_BOOK_SELF="自己添加";
 async function syncLibFromCloud(quiet){
   const c=cloudCreds();
   if(!c.url||!c.key){ if(!quiet)toast("未配置云端，无法同步总控词库"); return; }
-  try{
-    const r=await fetch(c.url+"/rest/v1/wordhero_lib?select=books,updated_at&id=eq."+LIB_MASTER_ID,{headers:cloudHeaders(c.key)});
-    let books=[];
-    if(r.ok){ const rows=await r.json(); if(rows.length) books=rows[0].books||[]; }
-    /* 初始化 / 补全：仅当总控行不存在、或「中考核心高频600词汇」这本书缺失时，才用本地中考词写入；
-       已存在则只做合并，绝不覆盖看板（家长）在云端增删的内容。 */
-    async function upsertLib(bks){
-      await fetch(c.url+"/rest/v1/wordhero_lib?on_conflict=id",{method:"POST",headers:Object.assign({},cloudHeaders(c.key),{"Prefer":"resolution=merge-duplicates,return=minimal"}),
-        body:JSON.stringify([{id:LIB_MASTER_ID,books:bks,updated_at:new Date().toISOString()}])}).catch(()=>{});
-    }
-    const zkWords=()=>ZKAO600.map(x=>({t:x.t,p:x.p,d:x.d}));
-    let needWrite=false;
-    if(!books.length){
-      books=[{name:"中考核心高频600词汇",words:zkWords()}]; needWrite=true;
-    }else if(!books.some(b=>b.name==="中考核心高频600词汇")){
-      books.push({name:"中考核心高频600词汇",words:zkWords()}); needWrite=true;
-    }
-    if(needWrite) await upsertLib(books);
-    let added=0;
-    books.filter(b=>b.name!==LIB_BOOK_SELF).forEach(b=>{
-      (b.words||[]).forEach(x=>{
-        const term=(x.t||"").trim().toLowerCase(); if(!term) return;
-        const w=WORDS.find(z=>z.term.toLowerCase()===term);
-        if(!w){
-          WORDS.unshift({id:uid(),term:x.t,phon:"",mean:x.d||"",ex:"",exCn:"",book:b.name,locked:true,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[],source:"master"});
-          added++;
-        }else{
-          w.mean=x.d||w.mean;
-          if(!w.book||w.book===LIB_BOOK_SELF) w.book=b.name;
-          w.locked=true;
-        }
-      });
+  const res=await cloudLibGet();
+  if(!res.ok){ if(!quiet) toast("总控词库同步失败："+(res.err||res.status||"")); return; }
+  const books=res.books||[];
+  const sub=subLibs();
+  let added=0, updated=0;
+  books.filter(b=>sub.includes(b.name)).forEach(b=>{
+    (b.words||[]).forEach(x=>{
+      const term=(x.t||"").trim().toLowerCase(); if(!term) return;
+      const w=WORDS.find(z=>z.term.toLowerCase()===term);
+      if(!w){
+        WORDS.unshift({id:uid(),term:x.t,phon:x.p||"",mean:x.d||"",ex:x.ex||"",exCn:x.exCn||"",book:b.name,locked:true,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[],source:"master"});
+        added++;
+      }else if(w.source==="master"){
+        w.mean=x.d||w.mean; w.phon=x.p||w.phon; w.ex=x.ex||w.ex; w.exCn=x.exCn||w.exCn; w.book=b.name; updated++;
+      }
     });
-    if(added||books.length) save();
-    if(!quiet && added) toast("☁ 已从总控同步 "+added+" 个新词");
-  }catch(e){ if(!quiet) toast("总控词库同步失败："+e.message); }
+  });
+  if(added||updated) save();
+  if(!quiet && (added||updated)) toast("☁ 已同步云端共用词库（+"+added+" / 更新"+updated+"）");
+}
+
+/* ============ 云端共用词库（管理员密码闸 + 学生订阅） ============ */
+let ADMIN_PWD=null; // 本次会话验证通过的管理密码（仅存内存/会话，不落长期存储）
+function subLibs(){ try{return JSON.parse(localStorage.getItem("wh_sub_libs")||"[]");}catch(e){return [];} }
+function subLibsSet(a){ try{localStorage.setItem("wh_sub_libs",JSON.stringify(a));}catch(e){} }
+
+/* 读取云端共用词库（匿名可读） */
+async function cloudLibGet(){
+  const c=cloudCreds(); if(!c.url||!c.key) return {ok:false,books:[]};
+  try{
+    const r=await fetch(c.url+"/rest/v1/wordhero_lib?select=books,updated_at&id=eq.master",{headers:cloudHeaders(c.key)});
+    if(!r.ok) return {ok:false,books:[],status:r.status};
+    const rows=await r.json();
+    const books=(rows&&rows[0]&&rows[0].books)||[];
+    return {ok:true,books,updated_at:(rows[0]&&rows[0].updated_at)||null};
+  }catch(e){ return {ok:false,books:[],err:e.message}; }
+}
+/* 写入云端共用词库（须带 x-admin-pwd 头，服务端 RLS 校验） */
+async function cloudLibPut(books){
+  const c=cloudCreds(); if(!c.url||!c.key) return {ok:false};
+  const headers=Object.assign({},cloudHeaders(c.key),{"x-admin-pwd":ADMIN_PWD||""});
+  try{
+    const r=await fetch(c.url+"/rest/v1/wordhero_lib?on_conflict=id",{method:"POST",
+      headers:Object.assign({},headers,{"Prefer":"resolution=merge-duplicates,return=minimal"}),
+      body:JSON.stringify([{id:"master",books:books,updated_at:new Date().toISOString()}])});
+    return {ok:r.ok,status:r.status};
+  }catch(e){ return {ok:false,err:e.message}; }
+}
+/* 验证管理密码（RPC，密码只在服务端比对） */
+async function verifyAdmin(pwd){
+  const c=cloudCreds(); if(!c.url||!c.key) return {ok:false};
+  try{
+    const r=await fetch(c.url+"/rest/v1/rpc/verify_admin",{method:"POST",
+      headers:Object.assign({},cloudHeaders(c.key),{"Content-Type":"application/json"}),
+      body:JSON.stringify({pwd:pwd})});
+    if(!r.ok) return {ok:false,status:r.status};
+    const j=await r.json(); return {ok:!!j};
+  }catch(e){ return {ok:false,err:e.message}; }
+}
+/* 修改管理密码（RPC） */
+async function setAdminPwdRemote(oldp,newp){
+  const c=cloudCreds(); if(!c.url||!c.key) return {ok:false};
+  try{
+    const r=await fetch(c.url+"/rest/v1/rpc/set_admin_pwd",{method:"POST",
+      headers:Object.assign({},cloudHeaders(c.key),{"Content-Type":"application/json"}),
+      body:JSON.stringify({oldpwd:oldp,newpwd:newp})});
+    if(!r.ok) return {ok:false,status:r.status};
+    const j=await r.json(); return {ok:!!j};
+  }catch(e){ return {ok:false,err:e.message}; }
+}
+/* 订阅 / 取消订阅 共用词库（拷入或移除本机 locked 词） */
+function subscribeLib(book, booksData){
+  const b=booksData.find(x=>x.name===book); if(!b) return 0;
+  let added=0;
+  (b.words||[]).forEach(x=>{
+    const term=(x.t||"").trim().toLowerCase(); if(!term) return;
+    if(!WORDS.find(z=>z.term.toLowerCase()===term)){
+      WORDS.unshift({id:uid(),term:x.t,phon:x.p||"",mean:x.d||"",ex:x.ex||"",exCn:x.exCn||"",book:book,locked:true,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[],source:"master"});
+      added++;
+    }
+  });
+  const s=subLibs(); if(!s.includes(book)){ s.push(book); subLibsSet(s); }
+  save(); return added;
+}
+function unsubscribeLib(book){
+  const before=WORDS.length;
+  WORDS=WORDS.filter(w=>!(w.source==="master" && (w.book||"")===book));
+  subLibsSet(subLibs().filter(b=>b!==book));
+  save(); return before-WORDS.length;
+}
+
+/* 管理员入口：未验证先弹密码登录 */
+async function openAdminLib(){
+  if(!cloudGlobalActive() && !(bkSettings().mode==="cloud")){ toast("未开启云端，无法管理共用词库"); return; }
+  if(!ADMIN_PWD && !sessionStorage.getItem("wh_admin_ok")){ adminLogin(); return; }
+  await renderAdminLib();
+}
+function adminLogin(){
+  const html=`<div class="card" style="padding:18px;max-width:340px">
+    <h3 style="margin:0 0 6px">🔐 云端管理员登录</h3>
+    <p class="muted small" style="font-size:12px;margin:0 0 8px">输入云端管理密码，才能批量编辑共用词库。初始密码请联系管理员（默认 chenfeng2026，请尽快修改）。</p>
+    <input id="adPwd" type="password" style="width:100%;padding:10px;font-size:16px;border:2px solid var(--line);border-radius:10px" placeholder="管理密码">
+    <div id="adErr" class="small" style="color:var(--bad);min-height:18px;margin-top:6px"></div>
+    <button class="btn" id="adOk" style="width:100%;margin-top:6px">登录</button>
+    <button class="btn ghost" id="adCancel" style="width:100%;margin-top:8px">取消</button>
+  </div>`;
+  openModal(html);
+  setTimeout(()=>{const i=document.getElementById("adPwd");if(i)i.focus();},60);
+  const tryLogin=async()=>{
+    const i=document.getElementById("adPwd"); const v=(i?i.value:"").trim(); if(!v) return;
+    const r=await verifyAdmin(v);
+    if(r.ok){ ADMIN_PWD=v; try{sessionStorage.setItem("wh_admin_ok","1");}catch(e){} closeModal(); await renderAdminLib(); }
+    else{ const e=document.getElementById("adErr"); if(e)e.textContent="❌ 密码错误"; }
+  };
+  document.getElementById("adOk").onclick=tryLogin;
+  document.getElementById("adCancel").onclick=closeModal;
+  const ip=document.getElementById("adPwd"); if(ip) ip.addEventListener("keydown",e=>{if(e.key==="Enter")tryLogin();});
+}
+async function renderAdminLib(){
+  const res=await cloudLibGet();
+  if(!res.ok){
+    openModal(`<div class="card" style="padding:18px;max-width:360px"><h3>⚠️ 无法连接云端词库</h3><p class="muted small">请先确认已在 Supabase 运行建表 SQL（wordhero_lib）。错误：${esc(res.err||('HTTP '+(res.status||'?')))}</p><button class="btn" onclick="closeModal()">关闭</button></div>`);
+    return;
+  }
+  const books=res.books||[];
+  const bookHtml=books.length?books.map((b,i)=>`
+    <div class="card" style="padding:12px;margin-bottom:8px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <b>📚 ${esc(b.name)}</b><span class="muted small">${(b.words||[]).length} 词</span>
+      </div>
+      <div class="row" style="gap:6px;margin-top:8px">
+        <button class="btn ghost" data-rename="${i}" style="flex:1;font-size:13px">重命名</button>
+        <button class="btn ghost" data-addw="${i}" style="flex:1;font-size:13px">➕ 加词</button>
+        <button class="btn ghost" data-delb="${i}" style="flex:1;font-size:13px;color:#e0524d">删除</button>
+      </div>
+    </div>`).join(""):`<div class="muted small">还没有共用词库，点下面“➕ 新建词库”。</div>`;
+  const html=`<div class="card" style="padding:16px;max-width:460px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 style="margin:0">☁ 云端共用词库管理</h3>
+      <button class="btn ghost" onclick="closeModal()" style="padding:4px 10px">关闭</button>
+    </div>
+    <p class="muted small" style="font-size:12px;margin:4px 0 8px">这些词库会推送给所有学生，学生在“我的→书本”里自行订阅。${res.updated_at?('云端更新：'+fmt(res.updated_at)):''}</p>
+    <button class="btn" id="adNewBook" style="width:100%;margin-bottom:8px">➕ 新建词库</button>
+    <div id="adBooks">${bookHtml}</div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+    <button class="btn ghost" id="adChgPwd" style="width:100%;font-size:13px">🔑 修改管理密码</button>
+  </div>`;
+  openModal(html);
+  document.getElementById("adNewBook").onclick=()=>{
+    const name=(prompt("输入新词库名称：")||"").trim(); if(!name) return;
+    if(books.some(b=>b.name===name)){ toast("已存在同名词库"); return; }
+    books.push({name:name,words:[]}); adminSave(books);
+  };
+  document.querySelectorAll("[data-rename]").forEach(btn=>btn.onclick=()=>{
+    const i=+btn.getAttribute("data-rename"); const b=books[i];
+    const n=(prompt("重命名词库：",b.name)||"").trim(); if(!n||n===b.name) return;
+    books[i].name=n; adminSave(books);
+  });
+  document.querySelectorAll("[data-addw]").forEach(btn=>btn.onclick=()=>{ const i=+btn.getAttribute("data-addw"); adminAddWords(books,i); });
+  document.querySelectorAll("[data-delb]").forEach(btn=>btn.onclick=()=>{
+    const i=+btn.getAttribute("data-delb"); const b=books[i];
+    if(!confirm("删除共用词库「"+b.name+"」？学生端已订阅的会被移除。")) return;
+    books.splice(i,1); adminSave(books);
+  });
+  document.getElementById("adChgPwd").onclick=adminChangePwd;
+}
+function adminSave(books){
+  cloudLibPut(books).then(r=>{
+    if(r.ok){ toast("✅ 已保存到云端"); renderAdminLib(); }
+    else{ toast("❌ 保存失败："+(r.status||r.err||"未知")+(r.status===401||r.status===403?"（管理密码可能已失效，请重新进入）":"")); }
+  });
+}
+function adminAddWords(books,i){
+  const b=books[i];
+  const txt=prompt("批量添加单词到「"+b.name+"」\n格式：单词|释义|音标|例句英|例句中（每行一个，音标例句可空）");
+  if(!txt) return;
+  let added=0;
+  txt.split(/\n+/).forEach(line=>{
+    const p=line.split("|"); const term=(p[0]||"").trim(); if(!term) return;
+    b.words=b.words||[];
+    const exist=b.words.find(x=>(x.t||"").toLowerCase()===term.toLowerCase());
+    if(exist){ exist.d=p[1]||exist.d; exist.p=p[2]||exist.p; exist.ex=p[3]||exist.ex; exist.exCn=p[4]||exist.exCn; }
+    else{ b.words.push({t:term,p:p[2]||"",d:p[1]||"",ex:p[3]||"",exCn:p[4]||""}); added++; }
+  });
+  if(added) adminSave(books); else toast("没有新词（可能都已存在）");
+}
+function adminChangePwd(){
+  const o=(prompt("输入当前管理密码：")||"").trim(); if(!o) return;
+  const n=(prompt("输入新管理密码：")||"").trim(); if(!n) return;
+  const c=(prompt("再次输入新管理密码：")||"").trim(); if(c!==n){ toast("两次不一致"); return; }
+  setAdminPwdRemote(o,n).then(r=>{
+    if(r.ok){ ADMIN_PWD=n; try{sessionStorage.setItem("wh_admin_ok","1");}catch(e){} toast("✅ 管理密码已更新"); }
+    else{ toast("❌ 修改失败："+(r.status||r.err||"当前密码可能错误")); }
+  });
+}
+
+/* 学生端：浏览 / 订阅 云端共用词库 */
+async function openCloudLibSubscribe(){
+  const html=`<div class="card" style="padding:16px;max-width:440px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 style="margin:0">☁ 云端共用词库</h3>
+      <button class="btn ghost" onclick="closeModal()" style="padding:4px 10px">关闭</button>
+    </div>
+    <p class="muted small" style="font-size:12px;margin:4px 0 8px">订阅后这些词会出现在你的词库里（锁定、随云端更新）。取消订阅则移除。</p>
+    <div id="clList" class="muted small">加载中…</div>
+  </div>`;
+  openModal(html);
+  const res=await cloudLibGet();
+  const el=document.getElementById("clList");
+  if(!res.ok){ el.innerHTML="⚠️ 无法连接云端（请确认已运行建表 SQL）。"+(res.err?(" "+esc(res.err)):""); return; }
+  const books=res.books||[]; const sub=subLibs();
+  if(!books.length){ el.innerHTML="云端还没有共用词库。需要管理员（陈锋）在「👪 家长 → 云端词库管理」里先创建。"; return; }
+  el.innerHTML=books.map(b=>`<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
+    <b style="flex:1">📚 ${esc(b.name)}</b><span class="muted small">${(b.words||[]).length}词</span>
+    ${sub.includes(b.name)?`<button class="btn ghost" data-unsub="${esc(b.name)}" style="font-size:12px;color:#e0524d">取消订阅</button>`:`<button class="btn green" data-sub="${esc(b.name)}" style="font-size:12px">订阅</button>`}
+  </div>`).join("");
+  document.querySelectorAll("[data-sub]").forEach(btn=>btn.onclick=async()=>{
+    const name=btn.getAttribute("data-sub"); const r=await cloudLibGet();
+    const n=subscribeLib(name, r.books||[]); save(); if(typeof cloudUpload==="function") cloudUpload(true);
+    toast("已订阅「"+name+"」+"+n+"词"); openCloudLibSubscribe();
+  });
+  document.querySelectorAll("[data-unsub]").forEach(btn=>btn.onclick=()=>{
+    const name=btn.getAttribute("data-unsub"); const n=unsubscribeLib(name);
+    save(); if(typeof cloudUpload==="function") cloudUpload(true);
+    toast("已取消订阅「"+name+"」移除"+n+"词"); openCloudLibSubscribe();
+  });
 }
 
 /* ============ 工具 ============ */
@@ -2893,6 +3083,7 @@ function requestParentPwd(onOk){
 }
 function submitParentPwd(){
   const i=document.getElementById("pwdInput");const v=(i?i.value:"").trim();
+  if(!PARENT_PWD){const e=document.getElementById("pwdErr");if(e)e.textContent="请先到「👪 家长 → 家长密码设置」设定密码";return;}
   if(v!==PARENT_PWD){const e=document.getElementById("pwdErr");if(e)e.textContent="❌ 密码错误，请重试";return;}
   closeModal();
   const cb=window.__onPwdOk;window.__onPwdOk=null;if(typeof cb==="function")cb();
@@ -3623,7 +3814,8 @@ function parentSection(kids){
   h+=`<button class="btn" id="addKid" style="width:100%;margin-top:10px">➕ 添加孩子</button>
       <button class="btn" id="viewKids" style="width:100%;margin-top:8px">📊 查看孩子数据</button>
       <button class="btn" id="parentBookMgr" style="width:100%;margin-top:8px;background:#eaf3ff;color:var(--accent)">📚 我的书本（重命名/删除）</button>
-      <button class="btn" id="parentWordMgr" style="width:100%;margin-top:8px;background:#fdeceb;color:#e0524d">📚 词库批量管理（添加/编辑/删除）</button>`;
+      <button class="btn" id="parentWordMgr" style="width:100%;margin-top:8px;background:#fdeceb;color:#e0524d">📚 词库批量管理（添加/编辑/删除）</button>
+      <button class="btn" id="adminLibBtn" style="width:100%;margin-top:8px;background:#fff4e0;color:#b9770e">☁ 云端词库管理（管理员）</button>`;
   return h;
 }
 function bindParentSection(kids){
@@ -3631,6 +3823,7 @@ function bindParentSection(kids){
   const view=document.getElementById("viewKids"); if(view) view.onclick=openKidsData;
   const bm=document.getElementById("parentBookMgr"); if(bm) bm.onclick=openBookManager;
   const wm=document.getElementById("parentWordMgr"); if(wm) wm.onclick=openParentWordMgr;
+  const ab=document.getElementById("adminLibBtn"); if(ab) ab.onclick=openAdminLib;
   document.querySelectorAll("[data-delkid]").forEach(b=>b.onclick=()=>{
     const i=+b.getAttribute("data-delkid"); const ks=accChildren().slice(); ks.splice(i,1); accChildrenSet(ks); openMyPanel();
   });
@@ -3754,6 +3947,7 @@ async function pullFullFromCloud(){
 function openBookManager(){
   const html=`<div class="card" style="padding:16px;max-width:420px">
     <h3 style="margin:0 0 6px">📚 我的书本</h3>
+    <button class="btn" id="bmCloud" style="width:100%;margin-bottom:8px;background:#eaf3ff;color:var(--accent)">☁ 浏览 / 订阅云端共用词库</button>
     <p class="muted small" style="font-size:12px;margin:0 0 8px">重命名会立即生效；删除书本会清空该书所有单词（需二次确认）。</p>
     <div id="bmList" style="max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:8px"></div>
     <div style="display:flex;gap:6px;margin-top:6px">
@@ -3830,6 +4024,7 @@ function openBookManager(){
   }
   }
   document.getElementById("bmAdd").onclick=addBook;
+  const bmCloud=document.getElementById("bmCloud"); if(bmCloud) bmCloud.onclick=openCloudLibSubscribe;
   document.getElementById("bmNew").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addBook(); } });
   document.getElementById("bmClose").onclick=()=>closeModal();
   render();
