@@ -1,4 +1,4 @@
-const CACHE = "wordhero-v11";
+const CACHE = "wordhero-v12";
 const FILES = ["index.html", "manifest.json", "icon.svg", "wordhero-icon.png"];
 
 self.addEventListener("install", e => {
@@ -24,16 +24,19 @@ self.addEventListener("fetch", e => {
   if (url.pathname.startsWith("/backup") || url.pathname.startsWith("/meta")) return;
 
   const isHtml = url.pathname.endsWith("/") || url.pathname.endsWith("index.html") || url.pathname.endsWith(".html");
-  if (isHtml) {
-    // HTML 用网络优先：保证代码更新后立刻生效，离线再回退缓存
+  const isVersion = url.pathname.endsWith("version.json");
+  // HTML 与 version.json 一律网络优先 + 绕过 HTTP 缓存：
+  // 1) 保证代码更新后立刻生效，不再被 GitHub Pages 的 10 分钟 HTTP 缓存拖住；
+  // 2) version.json 必须读最新值，否则「版本号变化强制刷新」会失效，App 永远停在旧页。
+  if (isHtml || isVersion) {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: "no-store" })
         .then(resp => { const copy = resp.clone(); caches.open(CACHE).then(c => c.put(e.request, copy).catch(() => {})); return resp; })
         .catch(() => caches.match(e.request).then(r => r || caches.match("index.html")))
     );
     return;
   }
-  // 其他静态资源用缓存优先
+  // 其他静态资源（图标等）用缓存优先，省流量
   e.respondWith(
     caches.match(e.request).then(r =>
       r || fetch(e.request).then(resp => {
