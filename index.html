@@ -509,11 +509,11 @@ communicate | 交流；沟通"></textarea>
         </div>
       </div>
       </div>
-    </div><div class="card center">
-      <h2>📲 扫码安装到手机</h2>
-      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQAAAADAX2ykAAACwElEQVR4nO1bUWrkMAyVFcN8JtAD9CiZG/RIpUfaG8RHmQMUks+CgxbJcSaTgpMsu7N2o/cxZKzHYPz6YllyDcERODxEB1B+GrgRX0P5aeBGfA3lp4Eb8TWUnwZuxNdQ/hnWx0ywYdBcYQwDAEOMXZ84n/3AA9wT81ti9Pw4sKpQEXU1cfJVSYjynv9u4En5w+RQc4WKAAYL5v0mSou7be7z3ws8Gd+uB1wDhgA8kHul/OePyj+4PjURuHnrvf71308DN+JrKH+ff2v26iCPoxXfmrZ/8fKCXtpY1zMNzFNfF3baCqD9daG7tAAwmmfOB5X/D/Sl5dBoyL169rSPxv7z30fl/9f1gXD4aeVoFE9FRH08H7VzQNCpXmlgrvyK5fsy5v1mo3UHTrL4qSXPB6enzmcncC/x1P4lIpaRXRue+APEyeFrhPq3SH2BBY0iczmrr3iMiDoh1RJVfYvVVzCrepeWgqq6/5atL4mWXUiY+UOKlDMWmuc2f1T+cf/SJDdxEu1B/fsz8isIRyOYUysKG3PcndW/xfJdw4blA5Fr2MQ37vg2EqqIPsxF+4OF588U3sUPYx6+vbhzmz8qf1//1wK0t0uoWsn9jcnJoX7F7n7g7wUqP4v1qblCFapWNsrdA9AHiwz1V2wyqF5pYK79/dESDNw1qtmxtbfkmk879Y+GBkzb5Th/VH4a9IiQK3NBIxyC5egr0P23XP+a6Vvl2bX8lZuEb59s3Rd+aVc+0/mj8nfnz8RpcihdhYKzX5Su1L9F/70N97tWo5FMOuTP800szZ+L7++3csyN9atFk1AyK91/f8T9WOC91r2NlvhOFrnrtDdTnvNH5R/af0nqz6Hq3E92Dk0GrT+X3j8CORBJkiVdozqelPT+RrH6Gv3/7qL0QuUngenwNyg/DdyIr6H8NHAjvoby0yh9fX4DIiL5UFNuLNsAAAAASUVORK5CYII=" alt="扫码安装" style="width:220px;max-width:70%;height:auto;background:#fff;padding:10px;border-radius:14px;box-shadow:var(--shadow)">
-      <p class="muted">两种方式任选其一，都能把单词本装到手机桌面：<br>① 用手机相机或浏览器扫上方二维码；② 点浏览器右上角 ⋮ →「安装应用 / 添加到主屏幕」。装好后离线也能用，且<b>自动更新</b>，无需重装。</p>
-      <div class="small muted">或手动复制安装地址，在手机浏览器打开：<br><b id="installUrl">（加载中…）</b><br><button class="btn ghost" id="copyUrlBtn" style="margin-top:6px;padding:6px 12px;font-size:12px">📋 复制地址</button></div>
+    </div>    </div><div class="card center">
+      <h2>📲 下载安装 App（安卓）</h2>
+      <p class="muted">陈锋词汇 <b>V1.1 独立版</b>（WebView 壳，打开即用、网页更新自动同步，无需重装）。下载后点击安装，若提示「未知发布者」请点「仍安装 / INSTALL ANYWAY」。</p>
+      <a class="btn green" href="wordhero-v1.1-webview.apk" download style="display:inline-block;margin-top:8px;padding:13px 24px;font-size:15px;font-weight:800">⬇ 下载 APK 安装包</a>
+      <div class="small muted" style="margin-top:12px">已装过旧版？本安装包用同一签名证书，可<b>直接覆盖升级</b>，不用先卸载。</div>
     </div></section>
 </div>
 
@@ -2704,14 +2704,6 @@ function renderPackUI(){
   }
 
   let html=alertHtml;
-  /* 顶部展示当前选中的书本（也可再次切换） */
-  html+=`<div class="card" style="border:2px solid var(--accent,#4f8cff)">
-    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-      <div><span class="muted small">当前学习书本：</span><b style="font-size:18px;color:var(--accent,#4f8cff)">📖 ${esc(LEARNING_BOOK)}</b></div>
-      <span class="muted small">本任务仅限本书 · 切换书本将重置今日词包</span>
-    </div>
-    <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="muted small" style="align-self:center">切换书本：</span>${bookChips()}</div>
-  </div>`;
 
   if(!PACK){
     if(WORDS.length===0){
@@ -2742,28 +2734,26 @@ function renderPackUI(){
       <div class="packwords" style="margin-top:10px">${words.map(w=>`<span class="pw" onclick="showWord('${w.id}')">${esc(w.term)}</span>`).join("")}</div>
       <div class="addline" style="margin-top:8px">点上面的单词可看详细解释；每天 0 点自动换一批新词，自选数量后立即生效；选回更少就锁定前 N 个，中途换练习方式都还是这些词。</div>
     </div>`;
-    /* 练习方式（依赖今日词包） */
-    html+=`<div class="card"><h2>🎯 练习方式（全部答对才通关）</h2>`;
+    /* 练习方式（依赖今日词包）—— 四宫格卡片化 */
+    html+=`<div class="card"><h2>🎯 练习方式（全部答对才通关）</h2><div class="mgrid">`;
     MODE_KEYS.forEach(mode=>{
       const pass=mPassN(mode), total=PACK.ids.length, all=mAllPass(mode);
       const started=mDoneN(mode)>0;
       const prog=total?Math.round(pass/total*100):0;
       const unfam=mUnfam(mode);
-      const pill=all?`<span class="pill g">✅ 已通关</span>`:`<span class="pill o">正确 ${pass}/${total}</span>`;
-      const unfamLine=(!all&&unfam.length)?`<div class="unfam-line">🔴 还不熟练：${unfam.map(w=>`<span class="pw bad2 sm">${esc(w.term)}</span>`).join("")}</div>`:"";
-      html+=`<div class="modeRow">
-        <div style="flex:1;min-width:0">
-          <div class="row" style="justify-content:space-between;align-items:center">
-            <b>${MODE_ICON[mode]} ${MODE_NAMES[mode]}</b>
-            ${pill}
-          </div>
-          <div class="prog"><i style="width:${prog}%"></i></div>
-          ${unfamLine}
-        </div>
-        <button class="btn ${all?'alt':'green'}" style="margin-left:10px;flex:0 0 auto;align-self:center" onclick="${all?`confirmRedo('${mode}')`:`startMode('${mode}')`}">${all?'↻ 重练':(started?'继续':'▶ 开始')}</button>
+      const status=all?`<div class="ml" style="color:var(--good);margin-top:4px">✅ 已通关</div>`
+                      :(started?`<div class="ml" style="color:var(--accent);margin-top:4px">▶ 继续练习</div>`
+                               :`<div class="ml" style="color:var(--muted);margin-top:4px">▶ 开始练习</div>`);
+      html+=`<div class="mcell ${all?'pass':''}" style="cursor:pointer" onclick="${all?`confirmRedo('${mode}')`:`startMode('${mode}')`}">
+        <div class="mi">${MODE_ICON[mode]}</div>
+        <div class="mn">${pass}/${total}</div>
+        <div class="ml">${MODE_NAMES[mode]}</div>
+        <div class="mbar"><i style="width:${prog}%"></i></div>
+        ${status}
+        ${(!all&&unfam.length)?`<div class="ml" style="color:var(--bad);margin-top:2px;font-size:11px">🔴 ${unfam.length} 个不熟</div>`:""}
       </div>`;
     });
-    html+=`</div>`;
+    html+=`</div></div>`;
   }
   /* 今日遗忘预警（遗忘曲线自动规划） */
   html+=`<div class="card warn-card">
@@ -4697,15 +4687,6 @@ if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.s
 
 /* ============ 启动 ============ */
 load();ensurePack();renderStats();renderPackUI();applyBkUI();applyAccentUI();ensureLogin();
-/* 安装地址自动显示当前托管网址 + 动态二维码 + 复制按钮（换任何托管都不用手改代码） */
-(function(){
-  const installUrlFull=(location.origin+"/wordhero/").replace(/([^:\/])\/\//g,"$1/");
-  const iu=document.getElementById("installUrl");
-  if(iu)iu.textContent=installUrlFull;
-  /* 二维码为离线静态图（构建时生成，指向安装地址），换托管请用脚本重新生成 */
-  const cb=document.getElementById("copyUrlBtn");
-  if(cb)cb.onclick=()=>{if(navigator.clipboard){navigator.clipboard.writeText(installUrlFull).then(()=>toast("已复制安装地址")).catch(()=>{});}};
-})();
 /* 初始化"添加词"书本选择器：默认跟随当前学习书本 */
 addBookState.picked=(LEARNING_BOOK && LEARNING_BOOK!=="全部")?LEARNING_BOOK:"自己添加";
 renderAwBookChips();
