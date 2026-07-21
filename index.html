@@ -257,11 +257,14 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   /* ====== 书本进度渐变百分比 ====== */
   .lib-book{display:flex;align-items:center;gap:10px;padding:12px;border:2px solid var(--line);border-radius:14px;margin:8px 0;cursor:pointer;background:#fff}
   .lib-book:hover{border-color:#cdd9f2}
-  .lib-book .bb-name{flex:1;min-width:0;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lib-book .bb-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .lib-book .bb-name{font-weight:800;font-size:15px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+  .lib-book .bb-bar{height:6px;border-radius:999px;background:#eef1f7;overflow:hidden}
+  .lib-book .bb-bar>i{display:block;height:100%;border-radius:999px}
   .lib-book .bb-meta{font-size:12px;color:var(--muted);white-space:nowrap}
   .bb-prog{position:relative;width:54px;height:54px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff}
   .bb-prog .bb-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--pcol) calc(var(--pp)*1%), #e7ecf5 0)}
-  .bb-prog .bb-txt{position:relative;z-index:1;background:#fff;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--pcol)}
+  .bb-prog .bb-txt{position:relative;z-index:1;background:#fff;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--pcol);font-size:11px;opacity:.5;font-weight:700}
   .lib-sort{display:flex;gap:6px;margin:4px 0 8px}
   /* ====== 日历热力（连续天数） ====== */
   .cal-heat{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
@@ -271,6 +274,7 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   .cal-heat .d.out{opacity:.4}
   .cal-heat .d .dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#fff}
   .cal-heat .d.nostudy{background:#ffe3e6;color:#e0524d}
+  .cal-heat .d.selected{font-weight:900;font-size:13px;color:var(--accent);outline:3px solid var(--accent);transform:scale(1.08);z-index:2}
   .cal-legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
   .cal-legend span{display:inline-flex;align-items:center;gap:5px}
   .cal-legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
@@ -330,8 +334,8 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
     </div>
     <div class="card">
       <h2>我的词库 (<span id="libCount">0</span>)</h2>
+      <input class="search" id="libSearch" placeholder="🔍 搜单词 / 释义 / 书本…">
       <div id="libBooks" class="lib-books"></div>
-      <input class="search" id="libSearch" placeholder="🔍 搜索单词或释义（跨本书）…">
       <div id="libList"></div>
     </div>
   </section>
@@ -411,14 +415,18 @@ communicate | 交流；沟通"></textarea>
   </section>
 
   <!-- 帮助 -->
-  <section class="panel" id="help">
-    <div class="card center">
-      <h2>📲 扫码安装到手机</h2>
-      <img src="data:image/png;base64,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" alt="扫码安装" alt="安装二维码" style="width:220px;max-width:70%;height:auto;background:#fff;padding:10px;border-radius:14px;box-shadow:var(--shadow)">
-      <p class="muted">两种方式任选其一，都能把单词本装到手机桌面：<br>① 用手机相机或浏览器扫上方二维码；② 点浏览器右上角 ⋮ →「安装应用 / 添加到主屏幕」。装好后离线也能用，且<b>自动更新</b>，无需重装。</p>
-      <div class="small muted">或手动复制安装地址，在手机浏览器打开：<br><b id="installUrl">（加载中…）</b><br><button class="btn ghost" id="copyUrlBtn" style="margin-top:6px;padding:6px 12px;font-size:12px">📋 复制地址</button></div>
-    </div>
-    <div class="card">
+  <section class="panel" id="help"><div class="card">
+      <h2>🔊 发音设置</h2>
+      <p class="muted" style="margin:0 0 10px;font-size:13px">电脑 / 带英文嗓音的设备用系统朗读（可离线）；手机 App 自动改用在线音频发音（需联网，单词和例句都能读，多音源自动切换）。可切换英式 / 美式口音。</p>
+      <label>发音口音</label>
+      <div class="row" id="accentChips">
+        <button class="chip" onclick="pickAccent('us',this)">🇺🇸 美式</button>
+        <button class="chip" onclick="pickAccent('uk',this)">🇬🇧 英式</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" style="flex:1" onclick="speak('review')">🔊 试听 review</button>
+      </div>
+    </div><div class="card">
       <h2>怎么用这个系统？</h2>
       <div class="acc">
         <div class="acc-h" onclick="toggleAcc(this)"><span>📘 学习页</span><i class="acc-ar">›</i></div>
@@ -442,21 +450,9 @@ communicate | 交流；沟通"></textarea>
         <div class="acc-h" onclick="toggleAcc(this)"><span>🔒 数据安全</span><i class="acc-ar">›</i></div>
         <div class="acc-b">所有单词只存在你这台设备的浏览器里。想换设备？用“设置”里的导出/导入把词库带走。</div>
       </div>
-    </div>
-    <div class="card">
-      <h2>🔊 发音设置</h2>
-      <p class="muted" style="margin:0 0 10px;font-size:13px">电脑 / 带英文嗓音的设备用系统朗读（可离线）；手机 App 自动改用在线音频发音（需联网，单词和例句都能读，多音源自动切换）。可切换英式 / 美式口音。</p>
-      <label>发音口音</label>
-      <div class="row" id="accentChips">
-        <button class="chip" onclick="pickAccent('us',this)">🇺🇸 美式</button>
-        <button class="chip" onclick="pickAccent('uk',this)">🇬🇧 英式</button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button class="btn" style="flex:1" onclick="speak('review')">🔊 试听 review</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>设置 & 数据</h2>
+    </div><div class="acc">
+      <div class="acc-h open" onclick="toggleAcc(this)"><span>⛙️ 设置 & 数据</span><i class="acc-ar">›</i></div>
+      <div class="acc-b" style="border-bottom:none">
       <div class="row">
         <button class="btn ghost" id="exportBtn">⬇ 导出词库(JSON)</button>
         <button class="btn ghost" id="importBtn">⬆ 导入词库(JSON)</button>
@@ -512,8 +508,13 @@ communicate | 交流；沟通"></textarea>
           <small>说明：服务器是你自己在家跑的小程序（见备份包里的 backup-server.js），数据只存在你这边，不会上传给任何公司。手机和电脑用同一个“设备名”就能互相备份恢复。</small>
         </div>
       </div>
-    </div>
-  </section>
+      </div>
+    </div><div class="card center">
+      <h2>📲 扫码安装到手机</h2>
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAFyAQAAAADAX2ykAAACwElEQVR4nO1bUWrkMAyVFcN8JtAD9CiZG/RIpUfaG8RHmQMUks+CgxbJcSaTgpMsu7N2o/cxZKzHYPz6YllyDcERODxEB1B+GrgRX0P5aeBGfA3lp4Eb8TWUnwZuxNdQ/hnWx0ywYdBcYQwDAEOMXZ84n/3AA9wT81ti9Pw4sKpQEXU1cfJVSYjynv9u4En5w+RQc4WKAAYL5v0mSou7be7z3ws8Gd+uB1wDhgA8kHul/OePyj+4PjURuHnrvf71308DN+JrKH+ff2v26iCPoxXfmrZ/8fKCXtpY1zMNzFNfF3baCqD9daG7tAAwmmfOB5X/D/Sl5dBoyL169rSPxv7z30fl/9f1gXD4aeVoFE9FRH08H7VzQNCpXmlgrvyK5fsy5v1mo3UHTrL4qSXPB6enzmcncC/x1P4lIpaRXRue+APEyeFrhPq3SH2BBY0iczmrr3iMiDoh1RJVfYvVVzCrepeWgqq6/5atL4mWXUiY+UOKlDMWmuc2f1T+cf/SJDdxEu1B/fsz8isIRyOYUysKG3PcndW/xfJdw4blA5Fr2MQ37vg2EqqIPsxF+4OF588U3sUPYx6+vbhzmz8qf1//1wK0t0uoWsn9jcnJoX7F7n7g7wUqP4v1qblCFapWNsrdA9AHiwz1V2wyqF5pYK79/dESDNw1qtmxtbfkmk879Y+GBkzb5Th/VH4a9IiQK3NBIxyC5egr0P23XP+a6Vvl2bX8lZuEb59s3Rd+aVc+0/mj8nfnz8RpcihdhYKzX5Su1L9F/70N97tWo5FMOuTP800szZ+L7++3csyN9atFk1AyK91/f8T9WOC91r2NlvhOFrnrtDdTnvNH5R/af0nqz6Hq3E92Dk0GrT+X3j8CORBJkiVdozqelPT+RrH6Gv3/7qL0QuUngenwNyg/DdyIr6H8NHAjvoby0yh9fX4DIiL5UFNuLNsAAAAASUVORK5CYII=" alt="扫码安装" style="width:220px;max-width:70%;height:auto;background:#fff;padding:10px;border-radius:14px;box-shadow:var(--shadow)">
+      <p class="muted">两种方式任选其一，都能把单词本装到手机桌面：<br>① 用手机相机或浏览器扫上方二维码；② 点浏览器右上角 ⋮ →「安装应用 / 添加到主屏幕」。装好后离线也能用，且<b>自动更新</b>，无需重装。</p>
+      <div class="small muted">或手动复制安装地址，在手机浏览器打开：<br><b id="installUrl">（加载中…）</b><br><button class="btn ghost" id="copyUrlBtn" style="margin-top:6px;padding:6px 12px;font-size:12px">📋 复制地址</button></div>
+    </div></section>
 </div>
 
 <div class="modal-bg" id="modalBg">
@@ -2386,6 +2387,7 @@ function statProg(p){return `<div class="stat"><div class="n">${p.pct}%</div><di
 
 /* ============ 连续天数：可点击日历 + 当日学习报告 ============ */
 let calMonth=0;
+let calSelected=null;
 function dayStudyInfo(key){
   let cnt=0,know=0,fuzzy=0,no=0,words=[];
   WORDS.forEach(w=>w.history.forEach(h=>{
@@ -2398,6 +2400,7 @@ function dayStudyInfo(key){
   return {cnt,know,fuzzy,no,words};
 }
 function openStreakCalendar(){
+  calSelected=null;
   const t=new Date();
   calMonth=t.getFullYear()*12+t.getMonth();
   renderCalModal();
@@ -2427,7 +2430,8 @@ function renderCalModal(){
     else if(inMonth) cls+=" nostudy";
     if(!inMonth) cls+=" out";
     if(isToday) cls+=" today";
-    grid+=`<div class="${cls}" onclick="calDay('${key}')">${d.getDate()}${info.cnt>0?`<span class="dot"></span>`:""}</div>`;
+    if(key===calSelected) cls+=" selected";
+    grid+=`<div class="${cls}" onclick="calDay('${key}',this)">${d.getDate()}${info.cnt>0?`<span class="dot"></span>`:""}</div>`;
     d.setDate(d.getDate()+1);
   }
   html+=grid+`</div>
@@ -2435,19 +2439,26 @@ function renderCalModal(){
       <span><i style="background:linear-gradient(135deg,var(--accent),var(--accent2))"></i>学过</span>
       <span><i style="background:#ffe3e6"></i>未学</span>
       <span><i style="background:#fff;outline:2px solid #ffd166"></i>今天</span>
+      <span><i style="background:#fff;outline:3px solid var(--accent)"></i>已选</span>
     </div>
-    <div id="calReport" class="info" style="margin-top:10px;display:none"></div>
+    <div id="calReport" class="info" style="margin-top:10px${calSelected?'':';display:none'}">${calSelected?calReportHTML(calSelected):''}</div>
     <div class="row" style="margin-top:10px"><button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button></div>
   </div>`;
   openModal(html);
 }
 function calStep(dir){ calMonth+=dir; renderCalModal(); }
-function calDay(key){
+function calReportHTML(key){
   const info=dayStudyInfo(key);
+  if(info.cnt===0) return `${esc(key)}：这天没有学习记录 🌙`;
+  return `<b>${esc(key)} 学习报告</b><br>复习 ${info.cnt} 次 · 认识 ${info.know} · 模糊 ${info.fuzzy} · 不认识 ${info.no}<br>所学单词：${(info.words.slice(0,20).map(esc).join("、")||"—")}${info.words.length>20?"…":""}`;
+}
+function calDay(key,cell){
+  calSelected=key;
+  document.querySelectorAll(".cal-heat .d.selected").forEach(x=>x.classList.remove("selected"));
+  if(cell) cell.classList.add("selected");
   const el=document.getElementById("calReport"); if(!el) return;
   el.style.display="block";
-  if(info.cnt===0){ el.innerHTML=`${esc(key)}：这天没有学习记录 🌙`; return; }
-  el.innerHTML=`<b>${esc(key)} 学习报告</b><br>复习 ${info.cnt} 次 · 认识 ${info.know} · 模糊 ${info.fuzzy} · 不认识 ${info.no}<br>所学单词：${(info.words.slice(0,20).map(esc).join("、")||"—")}${info.words.length>20?"…":""}`;
+  el.innerHTML=calReportHTML(key);
 }
 
 /* ============ 标签页 ============ */
@@ -3171,18 +3182,16 @@ function renderLib(){
     let stats=Array.from(new Set(WORDS.map(w=>w.book||"自己添加"))).map(b=>{const p=bookProgress(b);return {name:b,n:p.n,avg:p.avg};});
     if(q) stats=stats.filter(s=>s.name.toLowerCase().includes(q));
     if(!stats.length){ if(bb)bb.innerHTML=""; el.innerHTML=`<div class="muted center" style="padding:20px">还没有任何书本，去「➕ 添加」加词吧</div>`; return; }
-    if(libSort==="mastery") stats.sort((a,b)=>b.avg-a.avg);
-    else stats.sort((a,b)=>b.n-a.n);
+    stats.sort((a,b)=>b.n-a.n);
     if(bb) bb.innerHTML=`<button class="bk-tab on" onclick="libSetView('books')">📚 全部书本</button>`;
-    el.innerHTML=`<div class="lib-sort">
-        <button class="chip${libSort==='default'?' on':''}" onclick="libSetSort('default')">默认排序</button>
-        <button class="chip${libSort==='mastery'?' on':''}" onclick="libSetSort('mastery')">掌握度排序</button>
-      </div>`+
-      stats.map(s=>{
+    el.innerHTML=stats.map(s=>{
         const col=gradColor(s.avg);
         return `<div class="lib-book" onclick="libOpenBook('${esc(s.name)}')">
           <div class="bb-prog" style="--pp:${s.avg};--pcol:${col}"><div class="bb-txt">${s.avg}%</div></div>
-          <div class="bb-name">${esc(s.name)}</div>
+          <div class="bb-main">
+            <div class="bb-name">${esc(s.name)}</div>
+            <div class="bb-bar"><i style="width:${s.avg}%;background:${col}"></i></div>
+          </div>
           <div class="bb-meta">${s.n} 词</div>
         </div>`;
       }).join("");
@@ -3191,11 +3200,16 @@ function renderLib(){
 
   /* —— 单本书单词视图（前 5 个 + 更多） —— */
   const ws=WORDS.filter(w=>(w.book||"自己添加")===libView);
-  const list=ws.filter(w=>(w.term+" "+w.mean).toLowerCase().includes(q));
+  let list=ws.filter(w=>(w.term+" "+w.mean).toLowerCase().includes(q));
+  if(libSort==="mastery") list=list.slice().sort((a,b)=>b.mastery-a.mastery);
   if(bb) bb.innerHTML=`<button class="bk-tab" onclick="libSetView('books')">‹ 全部书本</button><button class="bk-tab on">${esc(libView)}</button>`;
   if(!list.length){ el.innerHTML=`<div class="muted center" style="padding:20px">这本书里还没有词</div>`; return; }
   const shown=libExpanded?list:list.slice(0,5);
-  el.innerHTML=shown.map(w=>`
+  el.innerHTML=`<div class="lib-sort">
+      <button class="chip${libSort==='default'?' on':''}" onclick="libSetSort('default')">默认排序</button>
+      <button class="chip${libSort==='mastery'?' on':''}" onclick="libSetSort('mastery')">掌握度排序</button>
+    </div>`+
+    shown.map(w=>`
     <div class="libitem" onclick="showWord('${w.id}')">
       <div class="libmain">
         <div class="w${w.term.length>15?' long':''}">${esc(w.term)}</div>
@@ -3511,7 +3525,6 @@ function renderParentPanel(){
   const pgrid=`<div class="pgrid">
     ${pstat(STREAK.count,"连续学习·天")}
     ${pstat(days.size,"累计学习·天")}
-    ${pstat(totalReviews,"总复习次数")}
     ${pstat(p.pct+"%","当前书本进度")}
     ${pstat(p.mastered+"/"+p.total,"已掌握单词量")}
     ${pstat(todayReviews,"今日复习·次")}
@@ -3524,7 +3537,6 @@ function renderParentPanel(){
 
   const report=`【陈锋本周单词学习报告】
 累计学习：${days.size} 天（连续 ${STREAK.count} 天）
-总复习次数：${totalReviews} 次（历史答对率 ${repRatio}%）
 当前书本进度：${p.pct}%（已掌握 ${p.mastered}/${p.total}）
 今日复习：${todayReviews} 次（正确率 ${acc}%）
 今日新词学习：${words.map(w=>w.term).join("、")||"—"}
@@ -4501,7 +4513,6 @@ function kidPanelHTML(name, words, streak, pack){
   const pgrid=`<div class="pgrid">
     ${pstat(streak.count,"连续学习·天")}
     ${pstat(days.size,"累计学习·天")}
-    ${pstat(totalReviews,"总复习次数")}
     ${pstat(p.pct+"%","当前书本进度")}
     ${pstat(p.mastered+"/"+p.total,"已掌握单词量")}
     ${pstat(todayReviews,"今日复习·次")}
