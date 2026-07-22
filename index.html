@@ -4041,7 +4041,8 @@ function cloudAutoUpload(){
       else { setTimeout(()=>{ try{reconcileOnConnect(false);}catch(e){} }, 2000); }
     }
     // 周期探活：应对部分设备不触发 online 事件的情况（仅“真正冲突”才提示，避免打扰）
-    setInterval(()=>{ try{ if(navigator.onLine) reconcileOnConnect(false); }catch(e){} }, 90000);
+    // 降频至 3 分钟：减少 Supabase 限流命中（限流曾是“有网却弹离线”的主因），也更省电
+    setInterval(()=>{ try{ if(navigator.onLine) reconcileOnConnect(false); }catch(e){} }, 180000);
   }catch(e){}
 })();
 
@@ -4217,28 +4218,33 @@ function showOfflineBanner(off){
     b.style.background="rgba(245,166,35,.96)"; b.style.color="#3a2a00"; b.style.display="block";
   }else{ b.style.display="none"; }
 }
-/* 轻量探测云端可达性，返回 {ok, ts}（ts=云端 updated_at 或 ""） */
+/* 轻量探测云端可达性，返回 {ok, ts}（ts=云端 updated_at 或 ""）。
+   加 6s 超时：避免请求挂起；失败仅代表“本次云端不可达”，不代表用户离线。 */
 async function netProbe(){
   const c=cloudCreds(); if(!c.url||!c.key) return {ok:false,ts:""};
+  const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),6000);
   try{
-    const r=await fetch(c.url+"/rest/v1/wordhero_backups?device_id=eq."+encodeURIComponent(deviceId())+"&select=updated_at&limit=1",{headers:cloudHeaders(c.key)});
+    const r=await fetch(c.url+"/rest/v1/wordhero_backups?device_id=eq."+encodeURIComponent(deviceId())+"&select=updated_at&limit=1",{headers:cloudHeaders(c.key),signal:ctrl.signal});
     if(!r.ok) return {ok:false,ts:""};
     const rows=await r.json();
     return {ok:true, ts:(rows[0]&&rows[0].updated_at)||""};
   }catch(e){ return {ok:false,ts:""}; }
+  finally{ clearTimeout(to); }
 }
-let _reconcileBusy=false, _reconcileSnoozedUntil=0;
+let _reconcileBusy=false, _reconcileSnoozedUntil=0, _netFailStreak=0;
 /* 联网恢复/启动后：判断是否需要同步或冲突解决。
    forcePrompt=true 时（重连事件）即使云端无变化也提示用户是否上传离线进度；
    否则仅在“本地与云端都有变化”这一真正冲突时才提示，避免在线时频繁打扰。 */
 async function reconcileOnConnect(forcePrompt){
   if(!cloudGlobalActive() && !(bkSettings().mode==="cloud")) return;
   if(_reconcileBusy) return;
-  if(!navigator.onLine){ showOfflineBanner(true); return; }
+  if(!navigator.onLine){ showOfflineBanner(true); _netFailStreak=0; return; }
   _reconcileBusy=true;
   try{
     const pr=await netProbe();
-    if(!pr.ok){ showOfflineBanner(true); return; }   // 探测失败按离线处理
+    // 云端单次请求失败（限流/抖动/鉴权）≠ 用户离线：连续 2 次失败才提示，过滤瞬时误报
+    if(!pr.ok){ _netFailStreak++; if(_netFailStreak>=2) showOfflineBanner(true); return; }
+    _netFailStreak=0;
     showOfflineBanner(false);
     const localChanged = whLastLocalChange() > whLastCloudSync();
     const cloudTs = pr.ts? new Date(pr.ts).getTime():0;
