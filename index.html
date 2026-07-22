@@ -3364,6 +3364,13 @@ function libSetSort(s){ libSort=s; renderLib(); }
 function libExpand(){ libExpanded=true; renderLib(); }
 document.getElementById("libSearch").oninput=debounce(renderLib,150);
 /* ============ [M09 词库 · 第2部分] 单词查看 / 删除 / 家长验证 ============ */
+function buildExBlock(w){
+  if(!w.ex) return `<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">例句查询中…</div></div>`;
+  return `<div class="wd-ex"><div class="lbl">📘 例句</div>
+    <div class="ex-en">${esc(w.ex)} <button class="spk" onclick="speak('${esc(w.ex)}')" title="听例句发音">🔊</button></div>
+    <div class="ex-cn" id="exCnBox">${w.exCn?esc(w.exCn)+`<span class="ex-src">来源：词库</span>`:`<span class="muted small">例句中文查询中…</span>`}</div>
+  </div>`;
+}
 function showWord(id){
   const w=WORDS.find(x=>x.id===id);if(!w)return;
   const SCOPE_NAMES={pack:"今日新词学习",weak:"薄弱词巩固",due:"待复习"};
@@ -3380,10 +3387,7 @@ function showWord(id){
       <div class="wd-phon">${esc(w.phon||"")||"—"}</div>
     </div>
     <div class="wd-mean">${esc(w.mean)||"—"}</div>
-    ${(w.ex)?`<div class="wd-ex"><div class="lbl">📘 例句</div>
-      <div class="ex-en">${esc(w.ex)} <button class="spk" onclick="speak('${esc(w.ex)}')" title="听例句发音">🔊</button></div>
-      <div class="ex-cn" id="exCnBox">${w.exCn?esc(w.exCn)+`<span class="ex-src">来源：词库</span>`:`<span class="muted small">例句中文查询中…</span>`}</div>
-    </div>`:""}
+    <div id="wdExWrap">${buildExBlock(w)}</div>
     <div class="wd-meta"><b>首次背词：</b>${fmt(w.addedAt)} · <b>最近复习：</b>${agoText(w.lastReviewed)} · <b>已复习：</b>${w.reviewCount} 次 · <b>掌握度：</b><span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span></div>
     <h3 style="font-size:15px;margin-top:14px">📜 历史记录</h3><div class="hist-scroll">${hist}</div>
     <div class="row modal-actions">
@@ -3396,8 +3400,22 @@ function showWord(id){
     speak(w.term);
     if(w.ex){ setTimeout(()=>speak(w.ex),1100); }
   },320);
+  /* 例句缺失时，当场联网补全（代理已上线）：取英式音频+日常双语例句回填并演示 */
+  if(!w.ex){
+    onlineLookup(w.term).then(r=>{
+      const box=document.getElementById("wdExWrap"); if(!box)return;
+      if(r&&!r.err&&r.ex){
+        w.ex=r.ex; if(r.exCn) w.exCn=r.exCn; if(r.ukAudio) w.ukAudio=r.ukAudio;
+        try{ save(); rebuildUkAudio(); }catch(e){}
+        box.innerHTML=buildExBlock(w);
+        setTimeout(()=>speak(r.ex),500); // 例句的演示
+      }else{
+        box.innerHTML=`<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">（暂无论据例句，可点「🔍 联网核查」）</div></div>`;
+      }
+    }).catch(()=>{ const box=document.getElementById("wdExWrap"); if(box) box.innerHTML=`<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">（查询失败，可点「🔍 联网核查」）</div></div>`; });
+  }
   /* 例句中文缺失时，自动联网翻译并标注来源（查询中已占位，结果回填） */
-  if(!w.exCn && w.ex){
+  if(w.ex && !w.exCn){
     onlineTranslate(w.ex).then(r=>{
       const box=document.getElementById("exCnBox");if(!box)return;
       if(r.zh){ w.exCn=r.zh; try{save();}catch(e){}
