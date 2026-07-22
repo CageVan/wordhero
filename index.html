@@ -3364,12 +3364,34 @@ function libSetSort(s){ libSort=s; renderLib(); }
 function libExpand(){ libExpanded=true; renderLib(); }
 document.getElementById("libSearch").oninput=debounce(renderLib,150);
 /* ============ [M09 词库 · 第2部分] 单词查看 / 删除 / 家长验证 ============ */
-function buildExBlock(w){
-  if(!w.ex) return `<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">例句查询中…</div></div>`;
-  return `<div class="wd-ex"><div class="lbl">📘 例句</div>
+function buildExBlock(w,status){
+  /* status: 未传/"loading"=查找中；"none"=暂无；"fail"=失败。w.ex 存在则直接显示例句 */
+  const retry=(id)=>`<button class="btn ghost" style="padding:2px 10px;font-size:12px;margin-left:6px" onclick="refetchEx('${id}')">🔄 重新获取</button>`;
+  if(w.ex){
+    return `<div class="wd-ex"><div class="lbl">📘 例句</div>
     <div class="ex-en">${esc(w.ex)} <button class="spk" onclick="speak('${esc(w.ex)}')" title="听例句发音">🔊</button></div>
     <div class="ex-cn" id="exCnBox">${w.exCn?esc(w.exCn)+`<span class="ex-src">来源：词库</span>`:`<span class="muted small">例句中文查询中…</span>`}</div>
   </div>`;
+  }
+  if(status==="none") return `<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">暂无例句${retry(w.id)}</div></div>`;
+  if(status==="fail") return `<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">例句获取失败，请检查网络${retry(w.id)}</div></div>`;
+  return `<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">🔍 查找例句中…</div></div>`;
+}
+/* 为单个词补抓例句（供详情打开时自动调用，也供「重新获取」按钮手动触发） */
+function refetchEx(id){
+  const w=WORDS.find(x=>x.id===id); if(!w)return;
+  const box=document.getElementById("wdExWrap"); if(box) box.innerHTML=buildExBlock(w,"loading");
+  onlineLookup(w.term).then(r=>{
+    const b=document.getElementById("wdExWrap"); if(!b)return;
+    if(r&&!r.err&&r.ex){
+      w.ex=r.ex; if(r.exCn) w.exCn=r.exCn; if(r.ukAudio) w.ukAudio=r.ukAudio;
+      try{ save(); rebuildUkAudio(); }catch(e){}
+      b.innerHTML=buildExBlock(w);
+      setTimeout(()=>speak(r.ex),400); // 例句的演示
+    }else{
+      b.innerHTML=buildExBlock(w,"none");
+    }
+  }).catch(()=>{ const b=document.getElementById("wdExWrap"); if(b) b.innerHTML=buildExBlock(w,"fail"); });
 }
 function showWord(id){
   const w=WORDS.find(x=>x.id===id);if(!w)return;
@@ -3401,19 +3423,7 @@ function showWord(id){
     if(w.ex){ setTimeout(()=>speak(w.ex),1100); }
   },320);
   /* 例句缺失时，当场联网补全（代理已上线）：取英式音频+日常双语例句回填并演示 */
-  if(!w.ex){
-    onlineLookup(w.term).then(r=>{
-      const box=document.getElementById("wdExWrap"); if(!box)return;
-      if(r&&!r.err&&r.ex){
-        w.ex=r.ex; if(r.exCn) w.exCn=r.exCn; if(r.ukAudio) w.ukAudio=r.ukAudio;
-        try{ save(); rebuildUkAudio(); }catch(e){}
-        box.innerHTML=buildExBlock(w);
-        setTimeout(()=>speak(r.ex),500); // 例句的演示
-      }else{
-        box.innerHTML=`<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">（暂无论据例句，可点「🔍 联网核查」）</div></div>`;
-      }
-    }).catch(()=>{ const box=document.getElementById("wdExWrap"); if(box) box.innerHTML=`<div class="wd-ex"><div class="lbl">📘 例句</div><div class="muted small">（查询失败，可点「🔍 联网核查」）</div></div>`; });
-  }
+  if(!w.ex){ refetchEx(w.id); }
   /* 例句中文缺失时，自动联网翻译并标注来源（查询中已占位，结果回填） */
   if(w.ex && !w.exCn){
     onlineTranslate(w.ex).then(r=>{
