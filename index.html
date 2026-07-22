@@ -676,6 +676,7 @@ function load(){
   seed();
 }
 function save(){
+  try{rebuildUkAudio();}catch(e){}
   try{localStorage.setItem(KEY,JSON.stringify({words:WORDS,streak:STREAK,pack:PACK}));}catch(e){toast("保存失败："+e.message);}
   try{localStorage.setItem("wh_lastLocalChange",String(Date.now()));}catch(e){} // 离线脏标记：本地最后变更时间
   try{ if(typeof cloudAutoUpload==="function") cloudAutoUpload(); }catch(e){}
@@ -2372,6 +2373,12 @@ let SPEAK_ACCENT="uk"; // 默认英式(type=2)；'us'=美式 type=1
 /* ============ [M03 工具 · 第3部分] 发音 TTS（speak / 在线发音 / 口音切换） ============ */
 function getAccent(){try{const a=localStorage.getItem("wordhero_accent");if(a==="us"||a==="uk")SPEAK_ACCENT=a;}catch(e){}return SPEAK_ACCENT;}
 function setAccent(a){SPEAK_ACCENT=a;try{localStorage.setItem("wordhero_accent",a);}catch(e){}}
+/* 英式发音音频映射：term(小写) -> dictionaryapi.dev 的 -uk.mp3 直链，优先于有道/系统TTS 播放地道英音 */
+let UK_AUDIO={};
+function rebuildUkAudio(){ const m={}; WORDS.forEach(w=>{ if(w&&w.ukAudio) m[(w.term||"").toLowerCase()]=w.ukAudio; }); UK_AUDIO=m; }
+/* 有道例句代理端点（Supabase Edge Function，需自行部署；未配置云端则留空=不抓例句） */
+function youdaoEp(){ const u=(typeof SB!=="undefined"&&SB&&SB.url)||""; return u? (u.replace(/\/$/,"")+"/functions/v1/youdao-examples") : ""; }
+function ydHeaders(){ const k=(typeof SB!=="undefined"&&SB&&SB.anon)||""; return k?{"apikey":k,"Authorization":"Bearer "+k}:{}; }
 function speak(t){
   t=(t||"").trim(); if(!t) return;
   /* 电脑/带英文嗓音的机型：优先系统离线朗读；
@@ -2412,11 +2419,13 @@ function tryWebSpeech(t){
 function _audioSources(t){
   const enc=encodeURIComponent(t);
   const yd=SPEAK_ACCENT==="uk"?2:1;   // 有道 1=美式 2=英式
-  return [
-    "https://dict.youdao.com/dictvoice?audio="+enc+"&type="+yd,
-    "https://dict.youdao.com/dictvoice?audio="+enc,
-    "https://api.frdic.com/api/v2/speech/speakweb?langid=en&txt="+enc
-  ];
+  const out=[];
+  const uk=UK_AUDIO[(t||"").toLowerCase()];   // 优先播该词抓到的英式 mp3
+  if(uk) out.push(uk);
+  out.push("https://dict.youdao.com/dictvoice?audio="+enc+"&type="+yd);
+  out.push("https://dict.youdao.com/dictvoice?audio="+enc);
+  out.push("https://api.frdic.com/api/v2/speech/speakweb?langid=en&txt="+enc);
+  return out;
 }
 function playOnline(t){
   const srcs=_audioSources(t);
@@ -3456,7 +3465,7 @@ function findSimilar(term,book){
   return WORDS.find(w=>w.term.toLowerCase()!==t && lev(w.term,t)<=2);
 }
 
-function addSingle(term,mean,phon,ex,exCn,bookOverride){
+function addSingle(term,mean,phon,ex,exCn,bookOverride,ukAudio){
   term=(term||"").trim();mean=(mean||"").trim();
   if(!term||!mean){toast("单词和释义都要填哦");return null;}
   const book=bookOverride||resolveAddBook();
@@ -3471,7 +3480,7 @@ function addSingle(term,mean,phon,ex,exCn,bookOverride){
   if(sim){
     if(!confirm(`你写的「${term}」和「${book}」里的「${sim.term}」很接近，是不是拼写重复了？\n点"确定"跳过添加，点"取消"仍然添加。`)){return null;}
   }
-  const w={id:uid(),term,phon:(phon||"").trim(),mean,ex:(ex||"").trim(),exCn:(exCn||"").trim(),book,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[{t:now(),act:"add"}],source:"user"};
+  const w={id:uid(),term,phon:(phon||"").trim(),mean,ex:(ex||"").trim(),exCn:(exCn||"").trim(),ukAudio:(ukAudio||"").trim(),book,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[{t:now(),act:"add"}],source:"user"};
   WORDS.unshift(w);save();renderStats();refreshPackIfEmpty();
   if(PACK&&PACK.ids.indexOf(w.id)>=0)toast("✅ 已添加并锁定为今日新词："+w.term); else toast("✅ 已添加到「"+book+"」："+w.term);
   return w;
@@ -3520,20 +3529,22 @@ document.getElementById("addOneBtn").onclick=async ()=>{
   const term=document.getElementById("awTerm").value.trim();
   const mean=document.getElementById("awMean").value.trim();
   if(!term||!mean){toast("单词和释义都要填哦");return;}
-  let phon="",ex="",exCn="";
-  /* 音标 / 例句 / 例句中文 缺省时，自动联网补全并存储（输入框已精简，留空即自动获取） */
+  let phon="",ex="",exCn="",uk="";
+  /* 音标 / 例句 / 例句中文 / 英式音频 缺省时，自动联网补全并存储 */
   if(!phon||!ex||!exCn){
     toast("🔄 正在联网获取音标 / 例句…");
     try{
       const r=await onlineLookup(term);
       if(r&&!r.err){
         if(!phon) phon=r.phon||"";
-        if(!ex){ const d0=(r.posDefs||[])[0]; ex=(d0&&d0.ex)?d0.ex:""; }
+        if(!ex) ex=r.ex||"";
+        if(!exCn&&ex) exCn=r.exCn||"";
+        if(r.ukAudio) uk=r.ukAudio;
       }
     }catch(e){}
-    if(!exCn&&ex){ try{ const tr=await onlineTranslate(ex); if(tr&&tr.zh) exCn=tr.zh; }catch(e){} }
+    if(!exCn&&ex){ try{ const tr=await onlineTranslate(ex); if(tr&&tr.zh) exCn=tr.zh; }catch(e2){} }
   }
-  const w=addSingle(term,mean,phon,ex,exCn);
+  const w=addSingle(term,mean,phon,ex,exCn,undefined,uk);
   if(w){
     document.getElementById("awTerm").value="";document.getElementById("awMean").value="";
   }
@@ -3554,16 +3565,16 @@ document.getElementById("addBatchBtn").onclick=async ()=>{
     if(findExact(term,book)){skipped++;msg.push(`• ${term} ——「${book}」里已存在，跳过`);continue;}
     const sim=findSimilar(term,book);
     if(sim){skipped++;msg.push(`• ${term} —— 与「${book}」里的「${sim.term}」太像，跳过（去重）`);continue;}
-    let ph=phon, e=ex, ec=exCn;
-    /* 缺省的三项自动联网补全 */
+    let ph=phon, e=ex, ec=exCn, uk="";
+    /* 缺省的三项自动联网补全（批量不抓例句代理，避免逐行请求过慢；仍取英式音频） */
     if(!ph||!e||!ec){
       try{
-        const r=await onlineLookup(term);
-        if(r&&!r.err){ if(!ph) ph=r.phon||""; if(!e){ const d0=(r.posDefs||[])[0]; e=(d0&&d0.ex)?d0.ex:""; } }
+        const r=await onlineLookup(term,{examples:false});
+        if(r&&!r.err){ if(!ph) ph=r.phon||""; if(!e) e=r.ex||""; if(!ec&&e) ec=r.exCn||""; if(r.ukAudio) uk=r.ukAudio; }
       }catch(e2){}
       if(!ec&&e){ try{ const tr=await onlineTranslate(e); if(tr&&tr.zh) ec=tr.zh; }catch(e2){} }
     }
-    WORDS.unshift({id:uid(),term,phon:ph,mean,ex:e,exCn:ec,book,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[{t:now(),act:"add"}],source:"user"});
+    WORDS.unshift({id:uid(),term,phon:ph,mean,ex:e,exCn:ec,ukAudio:uk,book,addedAt:now(),lastReviewed:null,reviewCount:0,mastery:0,history:[{t:now(),act:"add"}],source:"user"});
     added++;
   }
   save();renderStats();refreshPackIfEmpty();
@@ -4780,27 +4791,32 @@ document.getElementById("myBtn").onclick=openMyPanel;
 /* ============ [M18 联网查词/翻译 · 第1部分] 在线查词 / 翻译 ============ */
 const OL_DICT="https://api.dictionaryapi.dev/api/v2/entries/en/";
 const OL_TRANS="https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=";
-async function onlineLookup(term){
+async function onlineLookup(term,opts){
   term=(term||"").trim();
   if(!term)return {err:"请输入单词"};
-  let phon="",zh="";
-  const dP=fetch(OL_DICT+encodeURIComponent(term.toLowerCase()));
-  const tP=fetch(OL_TRANS+encodeURIComponent(term));
-  const [dR,tR]=await Promise.allSettled([dP,tP]);
-  if(dR.status==="fulfilled"){
-    try{
-      const data=await dR.value.json();
-      const arr=Array.isArray(data)?data:[];
-      if(arr.length){
-        phon=arr[0].phonetic||(arr[0].phonetics||[]).map(p=>p.text).filter(Boolean)[0]||"";
-      }
-    }catch(e){}
+  opts=opts||{};
+  let phon="",zh="",ukAudio="",ex="",exCn="";
+  /* 三路并行：词典(音标+英式音频) / 单词中文翻译 / 有道例句代理(日常向+中文) */
+  const proms=[];
+  proms.push(fetch(OL_DICT+encodeURIComponent(term.toLowerCase())).then(r=>r.json()).catch(()=>null));
+  proms.push(fetch(OL_TRANS+encodeURIComponent(term)).then(r=>r.json()).catch(()=>null));
+  const doEx=(opts.examples!==false)&&!!youdaoEp();
+  if(doEx) proms.push(fetch(youdaoEp()+"?q="+encodeURIComponent(term),{headers:ydHeaders()}).then(r=>r.json()).catch(()=>null));
+  const res=await Promise.all(proms);
+  const dict=res[0], trans=res[1], yd=doEx?res[2]:null;
+  if(dict&&Array.isArray(dict)&&dict.length){
+    const a=dict[0];
+    phon=a.phonetic||(a.phonetics||[]).map(p=>p.text).filter(Boolean)[0]||"";
+    const uk=(a.phonetics||[]).find(p=>(p.audio||"").includes("-uk.mp3")||(p.audio||"").includes("uk_"))||null;
+    if(uk&&uk.audio) ukAudio=uk.audio;
   }
-  if(tR.status==="fulfilled"){
-    try{const t=await tR.value.json();if(t&&t.responseData)zh=t.responseData.translatedText||"";}catch(e){}
+  if(trans&&trans.responseData) zh=trans.responseData.translatedText||"";
+  if(yd&&Array.isArray(yd.examples)&&yd.examples.length){
+    ex=(yd.examples[0].en||"").trim();
+    exCn=(yd.examples[0].zh||"").trim();
   }
   if(!phon&&!zh)return {err:"没查到这个词，请检查拼写或网络后重试"};
-  return {term,phon,zh};
+  return {term,phon,zh,ukAudio,ex,exCn};
 }
 function lookupHtml(r){
   if(r.err)return `<div class="info" style="color:var(--bad)">⚠️ ${esc(r.err)}</div>`;
@@ -4854,7 +4870,7 @@ function showLookup(term,mode){
         const book=resolveAddBook();
         if(findExact(term,book)){toast(term+" 在「"+book+"」里已经存在啦");closeModal();return;}
         const mean=r.zh||"";
-        const w=addSingle(term,mean,r.phon,"");
+        const w=addSingle(term,mean,r.phon,r.ex,r.exCn,undefined,r.ukAudio);
         if(w)closeModal();
       };
     }
@@ -4883,7 +4899,7 @@ document.getElementById("installClose").onclick=()=>ib.classList.add("hidden");
 if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});}
 
 /* ============ [M20 启动 · 第1部分] 启动与事件绑定 ============ */
-load();ensurePack();renderStats();renderPackUI();applyBkUI();applyAccentUI();ensureLogin();
+load();rebuildUkAudio();ensurePack();renderStats();renderPackUI();applyBkUI();applyAccentUI();ensureLogin();
 /* 初始化"添加词"书本选择器：默认跟随当前学习书本 */
 addBookState.picked=(LEARNING_BOOK && LEARNING_BOOK!=="全部")?LEARNING_BOOK:"自己添加";
 renderAwBookChips();
