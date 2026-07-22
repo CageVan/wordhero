@@ -455,7 +455,7 @@ communicate | 交流；沟通"></textarea>
         <div class="acc-h" onclick="toggleAcc(this)"><span>🔥 今日遗忘预警</span><i class="acc-ar">›</i></div>
         <div class="acc-b">根据遗忘曲线（掌握度越低复习间隔越短），自动列出今天该复习的已学单词；点单词看解释，点「▶ 去复习」开练。</div>
         <div class="acc-h" onclick="toggleAcc(this)"><span>⚠️ 薄弱词巩固</span><i class="acc-ar">›</i></div>
-        <div class="acc-b">主页会标出掌握度低于 60% 的「薄弱词」并提醒你；在「学习」页点「⚠️ 薄弱词巩固 › 开始巩固」可把这些词单独拉出来练。</div>
+        <div class="acc-b">主页会标出<b>已学过</b>且掌握度低于 60% 的「薄弱词」并提醒你（没学过的词不会算进来）；在「学习」页点「⚠️ 薄弱词巩固 › 开始巩固」可把这些词单独拉出来练。</div>
         <div class="acc-h" onclick="toggleAcc(this)"><span>🔄 练习页上方换方式</span><i class="acc-ar">›</i></div>
         <div class="acc-b">进入任意练习后，顶部有一排「🃏 闪卡 / ✅ 选择题 / ✍️ 拼写 / 🔊 听音」按钮，练着练着可随时换一种方式，不用退出重进（今日新词学习仍保持四种方式各自独立通关）。</div>
         <div class="acc-h" onclick="toggleAcc(this)"><span>➕ 添加页</span><i class="acc-ar">›</i></div>
@@ -2339,7 +2339,22 @@ function agoText(ts){if(!ts)return "还没复习过";const d=daysAgo(ts);if(d===
 /* ============ [M03 工具 · 第2部分] 掌握度分级与配色（mLevel / mText / dueIn） ============ */
 function mLevel(m){return m<30?"r":m<60?"o":m<85?"b":"g";}
 function mText(m){return m<30?"薄弱":m<60?"一般":m<85?"良好":"牢固";}
-function dueIn(w){const m=w.mastery;const iv=m<30?1:m<60?2:m<85?4:7;if(!w.lastReviewed)return true;return (now()-w.lastReviewed)>iv*86400000;}
+/* 是否已学过：有 learnedAt、或历史里有复习记录、或复习计数为正，都算“学过的词”（未学过的词不进薄弱词/待复习） */
+function isLearned(w){ return !!(w.learnedAt || (w.reviewCount||0)>0 || (w.history||[]).some(h=>h.act==="review")); }
+/* 首次新学当天的时间戳（遗忘曲线起点）：优先 learnedAt，否则取最早一次复习，再否则 addedAt */
+function earliestLearnTs(w){
+  if(w.learnedAt) return w.learnedAt;
+  let t=Infinity; (w.history||[]).forEach(h=>{ if(h.act==="review" && h.t<t) t=h.t; });
+  return t===Infinity ? (w.lastReviewed||w.addedAt||0) : t;
+}
+/* 待复习：仅“已学过的词”进入；遗忘曲线起点=首次新学当天，复习过后顺延 lastReviewed；
+   掌握度越低复习间隔越短（<30%→1天、<60%→2天、<85%→4天、其余→7天）。 */
+function dueIn(w){
+  if(!isLearned(w)) return false;                         // 没学过的词不进待复习
+  const m=w.mastery;const iv=m<30?1:m<60?2:m<85?4:7;
+  const anchor=w.lastReviewed||earliestLearnTs(w);       // 起点=首次新学当天
+  return (now()-anchor)>iv*86400000;
+}
 /* 发音：手机 WebView 经常没有系统英文朗读，默认用「有道在线音频」（国内可访问、最稳）；
    仅当系统确实带英文嗓音时才优先用系统朗读（可离线）。 */
 let SPEAK_ACCENT="uk"; // 默认英式(type=2)；'us'=美式 type=1
@@ -2440,9 +2455,10 @@ function currentBookProgress(){
   return {pct,mastered,total,name};
 }
 function renderStats(){
-  const total=WORDS.length;
-  const due=WORDS.filter(dueIn).length;
-  const learned=WORDS.filter(w=>w.reviewCount>0).length;
+  const ws=wordsInCurrentBook();
+  const total=ws.length;
+  const due=ws.filter(dueIn).length;
+  const learned=ws.filter(w=>w.reviewCount>0).length;
   const p=currentBookProgress();
   const newToday=PACK?PACK.ids.length:0;
   document.getElementById("statbar").innerHTML=
@@ -2762,7 +2778,7 @@ function bookChips(){
 }
 function renderPackUI(){
   const box=document.getElementById("studySetup");if(!box)return;
-  const weak=wordsInCurrentBook().filter(w=>w.mastery<60).sort((a,b)=>a.mastery-b.mastery);
+  const weak=wordsInCurrentBook().filter(w=>isLearned(w)&&w.mastery<60).sort((a,b)=>a.mastery-b.mastery);
   const dueList=wordsInCurrentBook().filter(dueIn);
   const alertHtml = weak.length ? `<div class="alert">⚠️ 当前词库有 <b>${weak.length}</b> 个薄弱词汇需要巩固！点下方「⚠️ 薄弱词巩固」里的「▶ 开始巩固」重点练习。</div>` : "";
 
@@ -2852,7 +2868,7 @@ function renderPackUI(){
       <button class="btn ${weak.length?'alt':'ghost'}" ${weak.length?'':'disabled'} onclick="startWeak()">▶ 开始巩固</button>
     </div>
     <div class="packwords" style="margin-top:10px">${weak.length?weak.slice(0,3).map(w=>`<span class="pw" style="border-color:var(--warn);color:var(--bad)" onclick="showWord('${w.id}')">${esc(w.term)}</span>`).join("")+(weak.length>3?`<span class="muted small"> …还有 ${weak.length-3} 个</span>`:""):`<span class="muted small">目前没有薄弱词，棒棒的！</span>`}</div>
-    <div class="addline" style="margin-top:8px">点单词可看详细解释；掌握度低于 60% 的单词会列在这里，建议每天重点复习。</div>
+    <div class="addline" style="margin-top:8px">点单词可看详细解释；<b>已学过</b>且掌握度低于 60% 的单词会列在这里（没学过的词不会出现），建议每天重点复习。</div>
   </div>`;
   box.innerHTML=html;
 }
@@ -2907,7 +2923,7 @@ function startMode(mode){
 function startWeak(){
   if(!LEARNING_BOOK){toast("请先在词库上方选择一本要学习的书");return;}
   const scope=wordsInCurrentBook();
-  const weak=scope.filter(w=>w.mastery<60).sort((a,b)=>a.mastery-b.mastery);
+  const weak=scope.filter(w=>isLearned(w)&&w.mastery<60).sort((a,b)=>a.mastery-b.mastery);
   if(!weak.length){toast("当前词库没有薄弱词，太棒了！");return;}
   openPractice(weak,"weak","薄弱词巩固 ("+weak.length+")","flash");
 }
@@ -3006,6 +3022,7 @@ function renderSession(){
 /* ============ [M08 练习 · 第3部分] 四种卡片题型（闪卡 / 选择 / 拼写 / 听音） ============ */
 function feedback(res){
   const w=SESSION.list[SESSION.idx];
+  if(!w.learnedAt) w.learnedAt=now();   // 首次学习当天记为「新学第一天」（遗忘曲线起点）
   w.mastery=Math.max(0,Math.min(100,w.mastery+(res==="know"?25:res==="fuzzy"?5:-15)));
   w.reviewCount++;w.lastReviewed=now();
   w.history.push({t:now(),act:"review",res,mode:SESSION.mode,scope:SESSION.scope});
@@ -3582,7 +3599,7 @@ function renderParentPanel(){
   }).join("")+`</div>`;
 
   /* 薄弱词（掌握度 < 60%） */
-  const weak=WORDS.filter(w=>w.mastery<60).sort((a,b)=>a.mastery-b.mastery).slice(0,12);
+  const weak=wordsInCurrentBook().filter(w=>isLearned(w)&&w.mastery<60).sort((a,b)=>a.mastery-b.mastery).slice(0,12);
 
   const repRatio=totalReviews?Math.round((knowN/totalReviews)*100):0;
   let suggest="";
@@ -4618,7 +4635,7 @@ function kidPanelHTML(name, words, streak, pack){
       ${all?`<div class="ml" style="color:var(--good);margin-top:4px">✅ 全对通关</div>`:(unfam.length?`<div class="ml" style="color:var(--bad);margin-top:4px">🔴 ${unfam.length}个不熟</div>`:"")}
     </div>`;
   }).join("")+`</div>`;
-  const weak=words.filter(w=>(w.mastery||0)<60).sort((a,b)=>(a.mastery||0)-(b.mastery||0)).slice(0,12);
+  const weak=bws.filter(w=>isLearned(w)&&(w.mastery||0)<60).sort((a,b)=>(a.mastery||0)-(b.mastery||0)).slice(0,12);
   const repRatio=totalReviews?Math.round((knowN/totalReviews)*100):0;
   let suggest="";
   if(total===0)suggest="词库还是空的，先带孩子添加一些单词吧。";
