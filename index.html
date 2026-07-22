@@ -559,32 +559,38 @@ communicate | 交流；沟通"></textarea>
 "use strict";
 /* =========================================================================
  *  WordHero 单文件 PWA · 模块目录（代码导航）
- *  全部逻辑都在这个 <script> 里，按“模块”从上到下排列，用「====」横幅分隔。
- *  要改某个功能，先在文件里搜下面的“横幅文字”即可跳到对应模块。
+ *  全部逻辑都在本 <script> 内，按“模块 M01–M20”从上到下排列，用「====」横幅分隔。
+ *  每个模块标注了“共 N 部分”，模块内用「[Mxx · 第N部分]」横幅定位。
+ *  要改某功能：在文件里搜「[Mxx」或横幅文字即可跳到对应部分。
  *
- *   数据层 .............. 本地存储 WORDS/STREAK/PACK、load/save、连续天数
- *   云端账号(Supabase) ... 匿名登录、会话、全局云端配置（SB / GLOBAL_CLOUD）
- *   云词库/管理员 ....... 云端书本订阅、家长远程增词、管理员口令
- *   工具 ................ dateKey、掌握度分级与配色、发音TTS、通用小工具
- *   顶部统计(状态栏) .... 今日任务 / 连续天数 / 书本进度 展示
- *   标签页/词包 ......... 底部导航、当前书本、每日词包 PACK、四方式进度
- *   练习(闪卡/选择/拼写/听音) . 四种练习方式与全屏练习视图
- *   词库/添加 ........... 我的词库、联网查词、添加/去重/删除单词
- *   统计面板 ............ 掌握度分布、遗忘曲线、7天打卡、成就
- *   弹窗&通用UI ......... openModal / confirmDialog / 手风琴 等
- *   云备份/同步 ......... 备份设置、上传下载、冲突智能合并、本地脏标记
- *   账号/登录/云端同步 ... 学生账号、登录门、云端备份拉取与恢复
- *   网络探测/冲突解决 ... 在线探测、离线横幅、连接后 reconcile
- *   家长/孩子管理 ....... 家长监控、孩子词库、单词管理、在线查词翻译
- *   启动 ................ load / ensurePack / 绑定事件 / 定时检查
+ *  M01 数据层（3部分）：本地存储与状态 / 全局云端配置 / Supabase匿名登录
+ *  M02 云词库·管理员（2部分）：云词库总控 / 云端共用词库
+ *  M03 工具（4部分）：日期与时间 / 掌握度分级与配色 / 发音TTS / 通用小工具
+ *  M04 顶部统计（1部分）：状态栏（今日任务 / 连续天数 / 书本进度）
+ *  M05 连续天数（1部分）：可点击日历 + 当日学习报告
+ *  M06 导航（1部分）：底部标签页切换
+ *  M07 学习（2部分）：学习选项(SEL/当前书本) / 添加词书本选择器
+ *  M08 练习（3部分）：词包PACK与四方式进度 / 练习入口与会话渲染 / 四种卡片题型
+ *  M09 词库（2部分）：词库列表与渲染 / 单词查看·删除·家长验证
+ *  M10 添加（1部分）：添加 / 去重 / 相似词
+ *  M11 统计面板（1部分）：掌握度分布 / 遗忘曲线 / 7天打卡 / 成就
+ *  M12 家长监控（1部分）：学习情况统计分析
+ *  M13 通用UI（1部分）：弹窗 / 确认 / 手风琴
+ *  M14 云备份（1部分）：备份设置 / 上传下载 / 冲突智能合并
+ *  M15 账号（5部分）：云端汇总看板 / 唯一ID码 / 账号登录云端同步 / 登录门·账户系统 / 我的账户页
+ *  M16 同步（3部分）：网络状态(离线横幅+重连) / 离线优先+云端为准 / 网络探测·冲突解决
+ *  M17 家长·孩子管理（5部分）：书本管理 / 单词管理 / 编辑单词 / 孩子账户 / 孩子数据看板
+ *  M18 联网查词/翻译（1部分）：在线查词 / 翻译
+ *  M19 PWA（1部分）：可安装 + 离线
+ *  M20 启动（1部分）：启动与事件绑定
  * ========================================================================= */
-/* ============ 数据层 ============ */
+/* ============ [M01 数据层 · 第1部分] 本地存储与状态（KEY / WORDS / STREAK / load / save / touchStreak） ============ */
 const KEY="wordhero_v1";
 let WORDS=[];      // 词库
 let STREAK={last:null,count:0}; // 连续天数
 let PARENT_PWD=(function(){try{return localStorage.getItem("wordhero_pwd")||"";}catch(e){return "";}})(); // 家长密码（删除在学/已学单词时需要）；未设置则为空，须先到「家长密码设置」设定
 
-/* ============ 全局云端配置（家长/发布者填一次，全员自动生效） ============
+/* ============ [M01 数据层 · 第2部分] 全局云端配置（家长/发布者填一次，全员自动生效） ============
    把你的 Supabase 项目 URL 和 anon/public key 填进来，重新部署后：
    · 每台手机安装打开即自动上传，孩子【只需输入自己的名字一次】；
    · URL / 密钥那两栏会自动隐藏，无需任何用户填写；
@@ -600,7 +606,7 @@ function cloudCreds(){
 /* 是否在「全局云端」模式下（即已统一配置且应自动同步） */
 function cloudGlobalActive(){ return !!(GLOBAL_CLOUD && GLOBAL_CLOUD.url && GLOBAL_CLOUD.key); }
 
-/* ============ Supabase Auth（免费·匿名账号·免邮箱免密码） ============ */
+/* ============ [M01 数据层 · 第3部分] Supabase 匿名登录（免费·免邮箱免密码） ============ */
 const SB = { url:(GLOBAL_CLOUD.url||"").replace(/\/$/,""), anon:(GLOBAL_CLOUD.key||"").trim() };
 const LS_SESS = "wordhero_sb_session";
 function sbLoad(){ try{return JSON.parse(localStorage.getItem(LS_SESS)||"null");}catch(e){return null;} }
@@ -2066,7 +2072,7 @@ function seed(){
   save();
 }
 
-/* ============ 云词库 / 管理员（云端书本订阅·家长远程增词·管理员口令；手机重启即同步） ============ */
+/* ============ [M02 云词库·管理员 · 第1部分] 云词库总控（云端书本订阅·家长远程增词·管理员口令；手机重启即同步） ============ */
 const LIB_MASTER_ID="master";
 const LIB_BOOK_SELF="自己添加";
 async function syncLibFromCloud(quiet){
@@ -2093,7 +2099,7 @@ async function syncLibFromCloud(quiet){
   if(!quiet && (added||updated)) toast("☁ 已同步云端共用词库（+"+added+" / 更新"+updated+"）");
 }
 
-/* ============ 云端共用词库（管理员密码闸 + 学生订阅） ============ */
+/* ============ [M02 云词库·管理员 · 第2部分] 云端共用词库（管理员密码闸 + 学生订阅） ============ */
 let ADMIN_PWD=null; // 本次会话验证通过的管理密码（仅存内存/会话，不落长期存储）
 function subLibs(){ try{return JSON.parse(localStorage.getItem("wh_sub_libs")||"[]");}catch(e){return [];} }
 function subLibsSet(a){ try{localStorage.setItem("wh_sub_libs",JSON.stringify(a));}catch(e){} }
@@ -2322,7 +2328,7 @@ async function openCloudLibSubscribe(){
   });
 }
 
-/* ============ 工具 ============ */
+/* ============ [M03 工具 · 第1部分] 日期与时间（dateKey / fmt / daysAgo / agoText） ============ */
 /* 日期 key：统一格式 "年-月-日"（不带前导零），用于日历 / 连续天数 / 今日任务匹配。
    全程序只此一处生成该 key，避免各模块各写一遍导致格式不一致（曾因此出现连续天数 bug）。 */
 function dateKey(ts){const d=new Date(ts==null?Date.now():ts);return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
@@ -2330,12 +2336,14 @@ function fmt(ts){if(!ts)return "还没复习过";const d=new Date(ts);const p=n=
 function daysAgo(ts){if(!ts)return null;return Math.floor((now()-ts)/86400000);}
 function agoText(ts){if(!ts)return "还没复习过";const d=daysAgo(ts);if(d===0)return "今天";if(d===1)return "昨天";if(d<7)return d+"天前";if(d<30)return Math.floor(d/7)+"周前";return Math.floor(d/30)+"个月前";}
 /* 掌握度分级：阈值 30/60/85 三档 → r(薄弱)/o(一般)/b(良好)/g(牢固)。配色统一从这里取，避免两处各写阈值。 */
+/* ============ [M03 工具 · 第2部分] 掌握度分级与配色（mLevel / mText / dueIn） ============ */
 function mLevel(m){return m<30?"r":m<60?"o":m<85?"b":"g";}
 function mText(m){return m<30?"薄弱":m<60?"一般":m<85?"良好":"牢固";}
 function dueIn(w){const m=w.mastery;const iv=m<30?1:m<60?2:m<85?4:7;if(!w.lastReviewed)return true;return (now()-w.lastReviewed)>iv*86400000;}
 /* 发音：手机 WebView 经常没有系统英文朗读，默认用「有道在线音频」（国内可访问、最稳）；
    仅当系统确实带英文嗓音时才优先用系统朗读（可离线）。 */
 let SPEAK_ACCENT="uk"; // 默认英式(type=2)；'us'=美式 type=1
+/* ============ [M03 工具 · 第3部分] 发音 TTS（speak / 在线发音 / 口音切换） ============ */
 function getAccent(){try{const a=localStorage.getItem("wordhero_accent");if(a==="us"||a==="uk")SPEAK_ACCENT=a;}catch(e){}return SPEAK_ACCENT;}
 function setAccent(a){SPEAK_ACCENT=a;try{localStorage.setItem("wordhero_accent",a);}catch(e){}}
 function speak(t){
@@ -2411,13 +2419,14 @@ function applyAccentUI(){
     b.classList.toggle("on", (b.getAttribute("onclick")||"").includes("'"+SPEAK_ACCENT+"'"));
   });
 }
+/* ============ [M03 工具 · 第4部分] 通用小工具（toast / debounce / lev / esc） ============ */
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800);}
 /* 防抖：连续触发时只在停止 ms 毫秒后执行一次（搜索框用，避免每敲一个字母就整表重渲染） */
 function debounce(fn,ms){let t;return function(){const a=arguments,c=this;clearTimeout(t);t=setTimeout(()=>fn.apply(c,a),ms||150);};}
 function lev(a,b){a=a.toLowerCase();b=b.toLowerCase();const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){const c=a[i-1]===b[j-1]?0:1;d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c);}return d[m][n];}
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
-/* ============ 顶部统计 ============ */
+/* ============ [M04 顶部统计 · 第1部分] 状态栏（今日任务 / 连续天数 / 书本进度） ============ */
 /* 当前书本学习进度：100% 才算“过关”（单词掌握度达到 100 视为通关） */
 function currentBookProgress(){
   const bk=LEARNING_BOOK;
@@ -2443,7 +2452,7 @@ function stat(n,l){return `<div class="stat"><div class="n">${n}</div><div class
 function statClick(n,l,fn){return `<div class="stat click" onclick="${fn}"><div class="n">${n}</div><div class="l">${l} ›</div></div>`;}
 function statProg(p){return `<div class="stat"><div class="n">${p.pct}%</div><div class="l">当前书本进度</div><div class="ls">已掌握 ${p.mastered}/${p.total}</div></div>`;}
 
-/* ============ 连续天数：可点击日历 + 当日学习报告 ============ */
+/* ============ [M05 连续天数 · 第1部分] 可点击日历 + 当日学习报告 ============ */
 let calMonth=0;
 let calSelected=null;
 function dayStudyInfo(key){
@@ -2531,7 +2540,7 @@ function calDay(key,cell){
   el.innerHTML=calReportHTML(key);
 }
 
-/* ============ 标签页 ============ */
+/* ============ [M06 导航 · 第1部分] 底部标签页切换 ============ */
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
   document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
@@ -2543,7 +2552,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.tab==="parent")renderParentPanel();
 });
 
-/* ============ 学习：选项 ============ */
+/* ============ [M07 学习 · 第1部分] 学习选项（SEL / 当前书本） ============ */
 let SEL={mode:"flash",range:"due",count:10};
 let LEARNING_BOOK=(function(){try{const v=localStorage.getItem("wordhero_learnbook")||"";return v;}catch(e){return "";}})();
 function setLearnBook(b){
@@ -2556,7 +2565,7 @@ function setLearnBook(b){
   if(typeof addBookState!=="undefined" && addBookState && addBookState.picked===b) renderAwBookChips();
 }
 
-/* ============ 添加词：书本选择器状态 ============ */
+/* ============ [M07 学习 · 第2部分] 添加词：书本选择器状态 ============ */
 /* addBookState.picked：当前选中的书本（"全部" 表示"自己添加"兜底） */
 let addBookState={picked:""};
 function resolveAddBook(){
@@ -2649,6 +2658,7 @@ const MODE_NAMES={flash:"闪卡翻牌",choice:"选择题",spell:"拼写",listen:
 const MODE_ICON={flash:"🃏",choice:"✅",spell:"✍️",listen:"🔊"};
 let PACK=null; // {date, ids:[], perMode:{flash:{done:{}},choice:{done:{}},spell:{done:{}},listen:{done:{}}}}
 
+/* ============ [M08 练习 · 第1部分] 词包 PACK 与四方式进度 ============ */
 function todayKey(){return dateKey(Date.now());}
 function mDone(mode){return PACK?PACK.perMode[mode].done:{};}
 function mDoneN(mode){return PACK?Object.keys(PACK.perMode[mode].done).length:0;}
@@ -2744,6 +2754,7 @@ function ensurePack(force){
 /* 添加新词后，若当前没有“今日新词”，自动锁定新词 */
 function refreshPackIfEmpty(){ if(!PACK||!PACK.ids||PACK.ids.length===0){ ensurePack(); } }
 /* 跳转到某个标签页（用于“去添加单词”等按钮） */
+/* ============ [M08 练习 · 第2部分] 练习入口与会话渲染 ============ */
 function switchTab(name){ const t=document.querySelector('.tab[data-tab="'+name+'"]'); if(t)t.click(); }
 
 function bookChips(){
@@ -2992,6 +3003,7 @@ function renderSession(){
   a.innerHTML=pvShell(SESSION.title||"练习", body);
 }
 /* 反馈按钮(认识/模糊/不认识)：know=答对(通过)，fuzzy/no=还不熟练，本轮会再练到，直到全部答对才通关 */
+/* ============ [M08 练习 · 第3部分] 四种卡片题型（闪卡 / 选择 / 拼写 / 听音） ============ */
 function feedback(res){
   const w=SESSION.list[SESSION.idx];
   w.mastery=Math.max(0,Math.min(100,w.mastery+(res==="know"?25:res==="fuzzy"?5:-15)));
@@ -3218,7 +3230,7 @@ function listenCard(w){
   </div>`;
 }
 
-/* ============ 词库 ============ */
+/* ============ [M09 词库 · 第1部分] 词库列表与渲染 ============ */
 let libView="books", libSort="default", libExpanded=false;
 /* 掌握度 → 颜色（SVG 用十六进制，与 CSS 变量 --bad/--warn/--accent/--good 同色）。阈值集中在 mLevel。 */
 function gradColor(m){return {"r":"#ff5d6c","o":"#f5a623","b":"#5b8cff","g":"#23c08a"}[mLevel(m)];}
@@ -3281,6 +3293,7 @@ function libSetView(v){ libView=v; libExpanded=false; renderLib(); }
 function libSetSort(s){ libSort=s; renderLib(); }
 function libExpand(){ libExpanded=true; renderLib(); }
 document.getElementById("libSearch").oninput=debounce(renderLib,150);
+/* ============ [M09 词库 · 第2部分] 单词查看 / 删除 / 家长验证 ============ */
 function showWord(id){
   const w=WORDS.find(x=>x.id===id);if(!w)return;
   const SCOPE_NAMES={pack:"今日新词学习",weak:"薄弱词巩固",due:"待复习"};
@@ -3349,7 +3362,7 @@ function submitParentPwd(){
   const cb=window.__onPwdOk;window.__onPwdOk=null;if(typeof cb==="function")cb();
 }
 
-/* ============ 添加（含去重） ============ */
+/* ============ [M10 添加 · 第1部分] 添加（含去重 / 相似词） ============ */
 /* 同一本书内查重：term + book 双重匹配。不同书本之间不去重、互相独立。
    不传 book 时为兼容历史代码（跨书本查重，谨慎使用） */
 function findExact(term,book){
@@ -3472,7 +3485,7 @@ document.getElementById("addBatchBtn").onclick=async ()=>{
   if(added)toast("✅ 批量导入 "+added+" 个到「"+book+"」");
 };
 
-/* ============ 统计面板 ============ */
+/* ============ [M11 统计面板 · 第1部分] 掌握度分布 / 遗忘曲线 / 7天打卡 / 成就 ============ */
 function renderStatsPanel(){
   const lv={r:0,o:0,b:0,g:0};
   WORDS.forEach(w=>lv[mLevel(w.mastery)]++);
@@ -3518,7 +3531,7 @@ function renderStatsPanel(){
   b.innerHTML=ach.length?ach.map(a=>`<span class="badge">${a}</span>`).join(""):`<span class="muted small">多练习就能解锁成就啦！</span>`;
 }
 
-/* ============ 家长监控：学习情况统计分析 ============ */
+/* ============ [M12 家长监控 · 第1部分] 学习情况统计分析 ============ */
 function dkey(ts){return ts?dateKey(ts):"";} /* 历史记录按日期归组用的 key（别名，语义更清晰） */
 function pstat(n,l){return `<div class="pstat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 let weakMoreOpen=false;
@@ -3695,7 +3708,7 @@ function fallbackCopy(t){const ta=document.createElement("textarea");ta.value=t;
   }
 })();
 
-/* ============ 弹窗 & 导入导出 ============ */
+/* ============ [M13 通用UI · 第1部分] 弹窗 / 确认 / 手风琴 ============ */
 function openModal(html){document.getElementById("modalBox").innerHTML=html;document.getElementById("modalBg").classList.add("show");}
 function closeModal(){document.getElementById("modalBg").classList.remove("show");}
 /* 自定义确认弹窗（替代浏览器 confirm()，避免手机 WebView 中 confirm 被直接驳回导致“点击无反应”） */
@@ -3751,7 +3764,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&a&&a.classList&&a.classList.contains("spbox")){spellCheck();}
 });
 
-/* ============ 云备份（联网核查） ============ */
+/* ============ [M14 云备份 · 第1部分] 备份设置 / 上传下载 / 冲突智能合并 ============ */
 function hashString(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;return h.toString(16);}
 function localHash(){return hashString(JSON.stringify(WORDS.map(w=>[w.term,w.mean,w.phon,w.ex,w.mastery,w.reviewCount,w.lastReviewed,w.addedAt])));}
 function bkSettings(){try{return JSON.parse(localStorage.getItem("wordhero_bk")||"{}");}catch(e){return {};}}
@@ -3837,8 +3850,8 @@ document.getElementById("bkUp").onclick=bkUpload;
 document.getElementById("bkDown").onclick=bkDownload;
 document.getElementById("bkCheck").onclick=bkVerify;
 
-/* ============ 云端汇总看板（Supabase·家长监控） ============ */
-/* ============ 唯一ID码（账号标识，云端主键） ============ */
+/* ============ [M15 账号 · 第1部分] 云端汇总看板（Supabase·家长监控） ============ */
+/* ============ [M15 账号 · 第2部分] 唯一ID码（账号标识，云端主键） ============ */
 const UID_KEY="wordhero_uid";
 function genUidCode(){
   const abc="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // 去掉易混字符 0/O/1/I/L
@@ -3848,7 +3861,7 @@ function genUidCode(){
 function uidGet(){ return localStorage.getItem(UID_KEY)||""; }
 function uidSet(v){ if(v) localStorage.setItem(UID_KEY,v); else localStorage.removeItem(UID_KEY); }
 function uidEnsure(){ let v=uidGet(); if(!v){ v=genUidCode(); uidSet(v); } return v; }
-/* ============ 账号 / 登录 / 云端同步（姓名+唯一ID码+角色·登录门·备份拉取恢复） ============ */
+/* ============ [M15 账号 · 第3部分] 账号 / 登录 / 云端同步（姓名+唯一ID码+角色·登录门·备份拉取恢复） ============ */
 function accGet(){ const s=bkSettings(); return {name:(s.ckName||"").trim(), uid:uidGet(), role:(s.role||"child")}; }
 function accIsLoggedIn(){ const a=accGet(); return !!(a.name && a.uid); }
 function accChildren(){ const s=bkSettings(); return s.children||[]; }
@@ -4018,7 +4031,7 @@ function cloudAutoUpload(){
   if(tb) tb.onclick=cloudTest;
 })();
 
-/* ============ 网络状态：离线横幅 + 重连冲突解决 ============ */
+/* ============ [M16 同步 · 第1部分] 网络状态：离线横幅 + 重连冲突解决 ============ */
 (function bindNet(){
   try{
     if(typeof navigator!=="undefined"){
@@ -4032,7 +4045,7 @@ function cloudAutoUpload(){
   }catch(e){}
 })();
 
-/* ============ 登录门 / 账户系统（姓名 + 唯一ID码） ============ */
+/* ============ [M15 账号 · 第4部分] 登录门 / 账户系统（姓名 + 唯一ID码） ============ */
 /* 启动入口：未登录则全屏遮挡，无法使用软件 */
 function ensureLogin(){
   if(accIsLoggedIn()){                  // 已登录（重启场景）
@@ -4123,7 +4136,7 @@ function bootAfterLogin(){
   if(typeof syncLibFromCloud==="function") syncLibFromCloud(true).then(()=>{ if(typeof renderLib==="function") renderLib(); }).catch(()=>{});
   cloudUpload(true);
 }
-/* ============ “我的”账户页（右上角） ============ */
+/* ============ [M15 账号 · 第5部分] “我的”账户页（右上角） ============ */
 function openMyPanel(){
   const a=accGet(); const kids=accChildren();
   const html=`<div class="card" style="padding:20px;max-width:390px">
@@ -4180,13 +4193,13 @@ async function cloudUploadWithDeleted(delIds){
     localStorage.setItem("wh_editorSync",ts);
   }catch(e){}
 }
-/* ============ 离线优先 + 云端为准 + 重连冲突手动解决 ============ */
+/* ============ [M16 同步 · 第2部分] 离线优先 + 云端为准 + 重连冲突手动解决 ============ */
 function whGet(k,d){ try{const v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;} }
 function whLastLocalChange(){ return +whGet("wh_lastLocalChange","0")||0; }
 function whLastCloudSync(){ return +whGet("wh_lastCloudSyncAt","0")||0; }
 function markCloudSynced(){ try{localStorage.setItem("wh_lastCloudSyncAt",String(Date.now()));}catch(e){} }
 
-/* ============ 网络探测 / 冲突解决 ============ */
+/* ============ [M16 同步 · 第3部分] 网络探测 / 冲突解决 ============ */
 /* 顶部网络横幅（离线提示） */
 function ensureNetBanner(){
   let b=document.getElementById("netBanner");
@@ -4281,7 +4294,7 @@ async function pullFullFromCloud(){
   }catch(e){ return false; }
 }
 
-/* ============ 家长 / 孩子管理（书本管理·单词管理·孩子数据·在线查词翻译） ============ */
+/* ============ [M17 家长·孩子管理 · 第1部分] 书本管理 ============ */
 /* 书本管理：重命名 / 删除 / 新建（在「我的 → 家长 → 我的书本」进入） */
 function openBookManager(){
   const html=`<div class="card" style="padding:16px;max-width:420px">
@@ -4369,6 +4382,7 @@ function openBookManager(){
   render();
 }
 /* 家长词库批量管理：添加 / 编辑 / 删除 三合一（选择统一用单词 id，避免下标错位） */
+/* ============ [M17 家长·孩子管理 · 第2部分] 单词管理 ============ */
 function openParentWordMgr(){
   const books={};
   WORDS.forEach(w=>{ const b=w.book||"(无词库)"; books[b]=(books[b]||0)+1; });
@@ -4508,6 +4522,7 @@ function openParentWordMgr(){
   setMode("delete"); pmRender();
 }
 /* 单独编辑一个单词（家长）：保存后重开管理面板，保持连续操作 */
+/* ============ [M17 家长·孩子管理 · 第3部分] 编辑单词 ============ */
 function openEditWord(id){
   const w=WORDS.find(x=>x.id===id); if(!w) return;
   const html=`<div class="card" style="padding:16px;max-width:380px">
@@ -4537,6 +4552,7 @@ function openEditWord(id){
     closeModal(); openParentWordMgr(); toast("已保存修改");
   };
 }
+/* ============ [M17 家长·孩子管理 · 第4部分] 孩子账户 ============ */
 function openAddKid(){
   const html=`<div class="card" style="padding:20px;max-width:360px">
     <h3 style="margin:0 0 6px">➕ 添加孩子</h3>
@@ -4629,6 +4645,7 @@ function kidPanelHTML(name, words, streak, pack){
     <div class="card"><h2>⚠️ 薄弱词清单（家长重点陪练）</h2>${weakHtml}</div>
   </div>`;
 }
+/* ============ [M17 家长·孩子管理 · 第5部分] 孩子数据看板 ============ */
 function openKidsData(){
   const kids=accChildren();
   if(!kids.length){ toast("还没有绑定孩子，请先在“我的”里添加"); return; }
@@ -4668,7 +4685,7 @@ function doLogout(){
 }
 document.getElementById("myBtn").onclick=openMyPanel;
 
-/* ============ 联网查词 / 翻译 ============ */
+/* ============ [M18 联网查词/翻译 · 第1部分] 在线查词 / 翻译 ============ */
 const OL_DICT="https://api.dictionaryapi.dev/api/v2/entries/en/";
 const OL_TRANS="https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=";
 async function onlineLookup(term){
@@ -4764,7 +4781,7 @@ document.getElementById("olInput").addEventListener("keydown",e=>{if(e.key==="En
 document.getElementById("addCloudLibBtn").onclick=openCloudLibSubscribe;
 document.getElementById("awLookupBtn").onclick=()=>{const t=document.getElementById("awTerm").value.trim();if(!t){toast("先在上面输入英文单词");return;}showLookup(t,"fill");};
 
-/* ============ PWA：可安装 + 离线 ============ */
+/* ============ [M19 PWA · 第1部分] 可安装 + 离线 ============ */
 let deferredPrompt=null;
 const ib=document.getElementById("installBar");
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;ib.classList.remove("hidden");});
@@ -4773,7 +4790,7 @@ document.getElementById("installBtn").onclick=async()=>{if(!deferredPrompt)retur
 document.getElementById("installClose").onclick=()=>ib.classList.add("hidden");
 if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});}
 
-/* ============ 启动 ============ */
+/* ============ [M20 启动 · 第1部分] 启动与事件绑定 ============ */
 load();ensurePack();renderStats();renderPackUI();applyBkUI();applyAccentUI();ensureLogin();
 /* 初始化"添加词"书本选择器：默认跟随当前学习书本 */
 addBookState.picked=(LEARNING_BOOK && LEARNING_BOOK!=="全部")?LEARNING_BOOK:"自己添加";
