@@ -2107,6 +2107,13 @@ async function syncLibFromCloud(quiet){
 let ADMIN_PWD=null; // 本次会话验证通过的管理密码（仅存内存/会话，不落长期存储）
 function subLibs(){ try{return JSON.parse(localStorage.getItem("wh_sub_libs")||"[]");}catch(e){return [];} }
 function subLibsSet(a){ try{localStorage.setItem("wh_sub_libs",JSON.stringify(a));}catch(e){} }
+/* 管理员是否已在本会话验证（内存 ADMIN_PWD 或 sessionStorage 标记） */
+function isAdminOK(){ return !!ADMIN_PWD || !!sessionStorage.getItem("wh_admin_ok"); }
+/* 需要管理员权限时调用：已验证直接执行 cb；否则弹管理员登录，登录成功后执行 cb */
+function requestAdminGate(cb){
+  if(isAdminOK()){ if(typeof cb==="function")cb(); return; }
+  adminLogin(cb);
+}
 
 /* 读取云端共用词库（匿名可读） */
 async function cloudLibGet(){
@@ -2179,7 +2186,7 @@ async function openAdminLib(){
   if(!ADMIN_PWD && !sessionStorage.getItem("wh_admin_ok")){ adminLogin(); return; }
   await renderAdminLib();
 }
-function adminLogin(){
+function adminLogin(onOk){
   const html=`<div class="card" style="padding:18px;max-width:340px">
     <h3 style="margin:0 0 6px">🔐 云端管理员登录</h3>
     <p class="muted small" style="font-size:12px;margin:0 0 8px">输入云端管理密码，才能批量编辑共用词库。初始密码请联系管理员（默认 chenfeng2026，请尽快修改）。</p>
@@ -2193,7 +2200,7 @@ function adminLogin(){
   const tryLogin=async()=>{
     const i=document.getElementById("adPwd"); const v=(i?i.value:"").trim(); if(!v) return;
     const r=await verifyAdmin(v);
-    if(r.ok){ ADMIN_PWD=v; try{sessionStorage.setItem("wh_admin_ok","1");}catch(e){} closeModal(); await renderAdminLib(); }
+    if(r.ok){ ADMIN_PWD=v; try{sessionStorage.setItem("wh_admin_ok","1");}catch(e){} closeModal(); if(typeof onOk==="function"){ await onOk(); } else { await renderAdminLib(); } }
     else{ const e=document.getElementById("adErr"); if(e)e.textContent="❌ 密码错误"; }
   };
   document.getElementById("adOk").onclick=tryLogin;
@@ -2597,7 +2604,11 @@ function resolveAddBook(){
 function renderAwBookChips(){
   const ids=["awBookChips","awBookChips2"];
   const cur=resolveAddBook();
-  const all=availableBooks().filter(b=>b!=="全部").concat(
+  const sub=subLibs();
+  let baseBooks=availableBooks().filter(b=>b!=="全部");
+  /* 非管理员不把「云端订阅书本」列为添加目标（防止往云端书里加词；管理员照常显示） */
+  if(!isAdminOK()) baseBooks=baseBooks.filter(b=>!sub.includes(b));
+  const all=baseBooks.concat(
     /* 也包含用户输入过但尚未出现在 WORDS 里的书本（用 state 维护） */
     (addBookState.custom||[]).filter(n=>!availableBooks().slice(1).includes(n))
   );
@@ -3045,6 +3056,11 @@ function renderSession(){
   else if(SESSION.mode==="spell")body=spellCard(w);
   else if(SESSION.mode==="listen")body=listenCard(w);
   a.innerHTML=pvShell(SESSION.title||"练习", body);
+  /* 自动朗读当前单词一次：flash(正面已显示单词)/spell(仅给释义需听发音) 自动读；
+     choice 不自动读(避免泄露答案)；listen 模式 listenCard 自带朗读，不重复 */
+  if(SESSION.mode==="flash"||SESSION.mode==="spell"){
+    setTimeout(()=>{ const ww=SESSION.list[SESSION.idx]; if(ww) speak(ww.term); },320);
+  }
 }
 /* 反馈按钮(认识/模糊/不认识)：know=答对(通过)，fuzzy/no=还不熟练，本轮会再练到，直到全部答对才通关 */
 /* ============ [M08 练习 · 第3部分] 四种卡片题型（闪卡 / 选择 / 拼写 / 听音） ============ */
@@ -3366,6 +3382,8 @@ function showWord(id){
       <button class="btn alt" style="flex:1" onclick="delWord('${w.id}')">🗑 删除</button>
       <button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button>
     </div>`);
+  /* 打开单词详情自动朗读一次 */
+  setTimeout(()=>speak(w.term),320);
   /* 例句中文缺失时，自动联网翻译并标注来源（查询中已占位，结果回填） */
   if(!w.exCn && w.ex){
     onlineTranslate(w.ex).then(r=>{
@@ -3379,7 +3397,17 @@ function showWord(id){
 function isStudiedWord(w){return (w.reviewCount||0)>0;} // 已练习过 = 在学/已学
 function delWord(id){
   const w=WORDS.find(x=>x.id===id); if(!w)return;
-  if(w.locked||isStudiedWord(w)){ requestParentPwd(()=>reallyDel(id)); return; } // 总控词/在学·已学需家长密码
+  if(w.source==="master"){
+    /* 云端共用词库的词：仅管理员可删（普通用户即使家长密码也不行） */
+    if(isAdminOK()){
+      if(confirm("删除云端书本「"+(w.book||"")+"」里的单词？")) reallyDel(id);
+    }else{
+      toast("🔒 云端书本的单词需管理员权限才能删除");
+      requestAdminGate(()=>reallyDel(id));
+    }
+    return;
+  }
+  if(w.locked||isStudiedWord(w)){ requestParentPwd(()=>reallyDel(id)); return; } // 在学·已学需家长密码
   if(!confirm("确定删除这个单词？"))return;
   reallyDel(id);
 }
@@ -3429,6 +3457,11 @@ function addSingle(term,mean,phon,ex,exCn,bookOverride){
   term=(term||"").trim();mean=(mean||"").trim();
   if(!term||!mean){toast("单词和释义都要填哦");return null;}
   const book=bookOverride||resolveAddBook();
+  /* 云端订阅书本：普通用户不能往里加词（管理员除外） */
+  if(!isAdminOK() && subLibs().includes(book)){
+    toast("🔒 「"+book+"」是云端书本，普通用户不能添加单词（需管理员）");
+    return null;
+  }
   const exist=findExact(term,book);
   if(exist){showDup(exist,mean,phon,ex,exCn);return null;}
   const sim=findSimilar(term,book);
@@ -3505,6 +3538,11 @@ document.getElementById("addOneBtn").onclick=async ()=>{
 document.getElementById("addBatchBtn").onclick=async ()=>{
   const lines=(document.getElementById("awBatch").value||"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
   const book=resolveAddBook();
+  /* 云端订阅书本：普通用户不能往里加词（管理员除外） */
+  if(!isAdminOK() && subLibs().includes(book)){
+    toast("🔒 「"+book+"」是云端书本，普通用户不能添加单词（需管理员）");
+    return;
+  }
   let added=0,skipped=0,msg=[];
   for(const line of lines){
     const p=line.split("|").map(s=>s.trim());
