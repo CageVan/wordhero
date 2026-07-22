@@ -1,0 +1,6 @@
+# WordHero 部署配置（仅用于「有道例句代理」这一个函数）
+# 部署命令见下方；项目 ID 用 --project-ref 在命令行传入即可，无需写在这里。
+
+[functions.youdao-examples]
+# 允许手机端用 anon key 匿名调用，否则会返回 401 拿不到例句
+verify_jwt = false
