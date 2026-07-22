@@ -557,6 +557,27 @@ communicate | 交流；沟通"></textarea>
 
 <script>
 "use strict";
+/* =========================================================================
+ *  WordHero 单文件 PWA · 模块目录（代码导航）
+ *  全部逻辑都在这个 <script> 里，按“模块”从上到下排列，用「====」横幅分隔。
+ *  要改某个功能，先在文件里搜下面的“横幅文字”即可跳到对应模块。
+ *
+ *   数据层 .............. 本地存储 WORDS/STREAK/PACK、load/save、连续天数
+ *   云端账号(Supabase) ... 匿名登录、会话、全局云端配置（SB / GLOBAL_CLOUD）
+ *   云词库/管理员 ....... 云端书本订阅、家长远程增词、管理员口令
+ *   工具 ................ dateKey、掌握度分级与配色、发音TTS、通用小工具
+ *   顶部统计(状态栏) .... 今日任务 / 连续天数 / 书本进度 展示
+ *   标签页/词包 ......... 底部导航、当前书本、每日词包 PACK、四方式进度
+ *   练习(闪卡/选择/拼写/听音) . 四种练习方式与全屏练习视图
+ *   词库/添加 ........... 我的词库、联网查词、添加/去重/删除单词
+ *   统计面板 ............ 掌握度分布、遗忘曲线、7天打卡、成就
+ *   弹窗&通用UI ......... openModal / confirmDialog / 手风琴 等
+ *   云备份/同步 ......... 备份设置、上传下载、冲突智能合并、本地脏标记
+ *   账号/登录/云端同步 ... 学生账号、登录门、云端备份拉取与恢复
+ *   网络探测/冲突解决 ... 在线探测、离线横幅、连接后 reconcile
+ *   家长/孩子管理 ....... 家长监控、孩子词库、单词管理、在线查词翻译
+ *   启动 ................ load / ensurePack / 绑定事件 / 定时检查
+ * ========================================================================= */
 /* ============ 数据层 ============ */
 const KEY="wordhero_v1";
 let WORDS=[];      // 词库
@@ -2045,7 +2066,7 @@ function seed(){
   save();
 }
 
-/* ============ 云端词库总控（家长远程增词，手机重启即同步） ============ */
+/* ============ 云词库 / 管理员（云端书本订阅·家长远程增词·管理员口令；手机重启即同步） ============ */
 const LIB_MASTER_ID="master";
 const LIB_BOOK_SELF="自己添加";
 async function syncLibFromCloud(quiet){
@@ -2302,11 +2323,14 @@ async function openCloudLibSubscribe(){
 }
 
 /* ============ 工具 ============ */
+/* 日期 key：统一格式 "年-月-日"（不带前导零），用于日历 / 连续天数 / 今日任务匹配。
+   全程序只此一处生成该 key，避免各模块各写一遍导致格式不一致（曾因此出现连续天数 bug）。 */
+function dateKey(ts){const d=new Date(ts==null?Date.now():ts);return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
 function fmt(ts){if(!ts)return "还没复习过";const d=new Date(ts);const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
 function daysAgo(ts){if(!ts)return null;return Math.floor((now()-ts)/86400000);}
 function agoText(ts){if(!ts)return "还没复习过";const d=daysAgo(ts);if(d===0)return "今天";if(d===1)return "昨天";if(d<7)return d+"天前";if(d<30)return Math.floor(d/7)+"周前";return Math.floor(d/30)+"个月前";}
+/* 掌握度分级：阈值 30/60/85 三档 → r(薄弱)/o(一般)/b(良好)/g(牢固)。配色统一从这里取，避免两处各写阈值。 */
 function mLevel(m){return m<30?"r":m<60?"o":m<85?"b":"g";}
-function mColor(m){return m<30?"var(--bad)":m<60?"var(--warn)":m<85?"var(--accent)":"var(--good)";}
 function mText(m){return m<30?"薄弱":m<60?"一般":m<85?"良好":"牢固";}
 function dueIn(w){const m=w.mastery;const iv=m<30?1:m<60?2:m<85?4:7;if(!w.lastReviewed)return true;return (now()-w.lastReviewed)>iv*86400000;}
 /* 发音：手机 WebView 经常没有系统英文朗读，默认用「有道在线音频」（国内可访问、最稳）；
@@ -2388,6 +2412,8 @@ function applyAccentUI(){
   });
 }
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800);}
+/* 防抖：连续触发时只在停止 ms 毫秒后执行一次（搜索框用，避免每敲一个字母就整表重渲染） */
+function debounce(fn,ms){let t;return function(){const a=arguments,c=this;clearTimeout(t);t=setTimeout(()=>fn.apply(c,a),ms||150);};}
 function lev(a,b){a=a.toLowerCase();b=b.toLowerCase();const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){const c=a[i-1]===b[j-1]?0:1;d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c);}return d[m][n];}
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
@@ -2623,7 +2649,7 @@ const MODE_NAMES={flash:"闪卡翻牌",choice:"选择题",spell:"拼写",listen:
 const MODE_ICON={flash:"🃏",choice:"✅",spell:"✍️",listen:"🔊"};
 let PACK=null; // {date, ids:[], perMode:{flash:{done:{}},choice:{done:{}},spell:{done:{}},listen:{done:{}}}}
 
-function todayKey(){const d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
+function todayKey(){return dateKey(Date.now());}
 function mDone(mode){return PACK?PACK.perMode[mode].done:{};}
 function mDoneN(mode){return PACK?Object.keys(PACK.perMode[mode].done).length:0;}
 function mAllDone(mode){return !!PACK && PACK.ids.length>0 && PACK.ids.every(id=>PACK.perMode[mode].done[id]);}
@@ -3194,7 +3220,8 @@ function listenCard(w){
 
 /* ============ 词库 ============ */
 let libView="books", libSort="default", libExpanded=false;
-function gradColor(m){ if(m<30)return "#ff5d6c"; if(m<60)return "#f5a623"; if(m<85)return "#5b8cff"; return "#23c08a"; }
+/* 掌握度 → 颜色（SVG 用十六进制，与 CSS 变量 --bad/--warn/--accent/--good 同色）。阈值集中在 mLevel。 */
+function gradColor(m){return {"r":"#ff5d6c","o":"#f5a623","b":"#5b8cff","g":"#23c08a"}[mLevel(m)];}
 function bookProgress(book){
   const ws=WORDS.filter(w=>(w.book||"自己添加")===book);
   const avg=ws.length?Math.round(ws.reduce((s,w)=>s+w.mastery,0)/ws.length):0;
@@ -3253,7 +3280,7 @@ function libOpenBook(b){ libView=b; libExpanded=false; renderLib(); }
 function libSetView(v){ libView=v; libExpanded=false; renderLib(); }
 function libSetSort(s){ libSort=s; renderLib(); }
 function libExpand(){ libExpanded=true; renderLib(); }
-document.getElementById("libSearch").oninput=renderLib;
+document.getElementById("libSearch").oninput=debounce(renderLib,150);
 function showWord(id){
   const w=WORDS.find(x=>x.id===id);if(!w)return;
   const SCOPE_NAMES={pack:"今日新词学习",weak:"薄弱词巩固",due:"待复习"};
@@ -3492,7 +3519,7 @@ function renderStatsPanel(){
 }
 
 /* ============ 家长监控：学习情况统计分析 ============ */
-function dkey(ts){if(!ts)return "";const d=new Date(ts);return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
+function dkey(ts){return ts?dateKey(ts):"";} /* 历史记录按日期归组用的 key（别名，语义更清晰） */
 function pstat(n,l){return `<div class="pstat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 let weakMoreOpen=false;
 function toggleWeakMore(){
@@ -3524,7 +3551,7 @@ function renderParentPanel(){
 
   /* 近 7 天学习活跃度（每天复习次数） */
   const act=[];
-  for(let i=6;i>=0;i--){const d=new Date();const dd=new Date(d.getTime()-i*86400000);const key=dd.getFullYear()+"-"+(dd.getMonth()+1)+"-"+dd.getDate();const cnt=WORDS.reduce((s,w)=>s+w.history.filter(h=>h.act==="review"&&dkey(h.t)===key).length,0);act.push({key,label:(dd.getMonth()+1)+"/"+dd.getDate(),cnt});}
+  for(let i=6;i>=0;i--){const d=new Date();const dd=new Date(d.getTime()-i*86400000);const key=dateKey(dd.getTime());const cnt=WORDS.reduce((s,w)=>s+w.history.filter(h=>h.act==="review"&&dkey(h.t)===key).length,0);act.push({key,label:(dd.getMonth()+1)+"/"+dd.getDate(),cnt});}
   const maxAct=Math.max(1,...act.map(a=>a.cnt));
 
   /* 今日词包 + 四种方式进度（四宫格） */
@@ -3821,7 +3848,7 @@ function genUidCode(){
 function uidGet(){ return localStorage.getItem(UID_KEY)||""; }
 function uidSet(v){ if(v) localStorage.setItem(UID_KEY,v); else localStorage.removeItem(UID_KEY); }
 function uidEnsure(){ let v=uidGet(); if(!v){ v=genUidCode(); uidSet(v); } return v; }
-/* ============ 账户（姓名 + 唯一ID码 + 角色） ============ */
+/* ============ 账号 / 登录 / 云端同步（姓名+唯一ID码+角色·登录门·备份拉取恢复） ============ */
 function accGet(){ const s=bkSettings(); return {name:(s.ckName||"").trim(), uid:uidGet(), role:(s.role||"child")}; }
 function accIsLoggedIn(){ const a=accGet(); return !!(a.name && a.uid); }
 function accChildren(){ const s=bkSettings(); return s.children||[]; }
@@ -4159,6 +4186,7 @@ function whLastLocalChange(){ return +whGet("wh_lastLocalChange","0")||0; }
 function whLastCloudSync(){ return +whGet("wh_lastCloudSyncAt","0")||0; }
 function markCloudSynced(){ try{localStorage.setItem("wh_lastCloudSyncAt",String(Date.now()));}catch(e){} }
 
+/* ============ 网络探测 / 冲突解决 ============ */
 /* 顶部网络横幅（离线提示） */
 function ensureNetBanner(){
   let b=document.getElementById("netBanner");
@@ -4253,6 +4281,7 @@ async function pullFullFromCloud(){
   }catch(e){ return false; }
 }
 
+/* ============ 家长 / 孩子管理（书本管理·单词管理·孩子数据·在线查词翻译） ============ */
 /* 书本管理：重命名 / 删除 / 新建（在「我的 → 家长 → 我的书本」进入） */
 function openBookManager(){
   const html=`<div class="card" style="padding:16px;max-width:420px">
@@ -4425,7 +4454,7 @@ function openParentWordMgr(){
   }
   document.querySelectorAll("[data-pmmode]").forEach(btn=>btn.onclick=()=>setMode(btn.getAttribute("data-pmmode")));
   document.getElementById("pmBook").onchange=pmRender;
-  document.getElementById("pmSearch").oninput=pmRender;
+  document.getElementById("pmSearch").oninput=debounce(pmRender,150);
   document.getElementById("pmList").addEventListener("change",(e)=>{
     if(e.target.classList.contains("pmCk")){
       const id=e.target.value;
@@ -4552,7 +4581,7 @@ function kidPanelHTML(name, words, streak, pack){
   const todayKnow=words.reduce((s,w)=>s+(w.history||[]).filter(h=>h.act==="review"&&dkey(h.t)===today&&h.res==="know").length,0);
   const acc=todayReviews?Math.round(todayKnow/todayReviews*100):0;
   const act=[];
-  for(let i=6;i>=0;i--){const d=new Date();const dd=new Date(d.getTime()-i*86400000);const key=dd.getFullYear()+"-"+(dd.getMonth()+1)+"-"+dd.getDate();const cnt=words.reduce((s,w)=>s+(w.history||[]).filter(h=>h.act==="review"&&dkey(h.t)===key).length,0);act.push({key,label:(dd.getMonth()+1)+"/"+dd.getDate(),cnt});}
+  for(let i=6;i>=0;i--){const d=new Date();const dd=new Date(d.getTime()-i*86400000);const key=dateKey(dd.getTime());const cnt=words.reduce((s,w)=>s+(w.history||[]).filter(h=>h.act==="review"&&dkey(h.t)===key).length,0);act.push({key,label:(dd.getMonth()+1)+"/"+dd.getDate(),cnt});}
   const maxAct=Math.max(1,...act.map(a=>a.cnt));
   const wordsArr=pack?pack.ids.map(id=>words.find(w=>w.id===id)).filter(Boolean):[];
   const modeGrid=`<div class="mgrid">`+MODE_KEYS.map(m=>{
