@@ -55,8 +55,8 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   .stat .n{font-size:24px;font-weight:800}
   .stat .l{font-size:12px;color:var(--muted)}
   .stat .ls{font-size:11px;color:var(--muted);margin-top:3px}
-  .tabs{position:sticky;top:var(--safe-top);z-index:20;display:flex;gap:6px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px;border-radius:16px;margin-bottom:16px;box-shadow:var(--shadow);overflow:auto}
-  .tab{flex:1;min-width:64px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:14px;padding:10px 6px;border-radius:12px;cursor:pointer;white-space:nowrap}
+  .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:920px;z-index:50;display:flex;gap:4px;background:var(--card);border-top:1px solid var(--line);padding:8px 6px calc(var(--safe-bot,0px) + 8px);box-shadow:0 -4px 18px rgba(0,0,0,.10);overflow-x:auto}
+  .tab{flex:1;min-width:0;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13px;padding:10px 4px;border-radius:12px;cursor:pointer;white-space:nowrap}
   .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 6px 16px rgba(91,140,255,.35)}
   .panel{display:none}
   .panel.active{display:block;animation:fade .25s ease}
@@ -291,6 +291,12 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   .cal-heat .d .dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#fff}
   .cal-heat .d.nostudy{background:#ffe3e6;color:#e0524d}
   .cal-heat .d.selected{font-weight:900;font-size:13px;color:var(--accent);outline:3px solid var(--accent);transform:scale(1.08);z-index:2}
+  .cal-heat .d.new{background:linear-gradient(135deg,#5b8cff,#7aa2ff);color:#fff}
+  .cal-heat .d.done{background:linear-gradient(135deg,#f5b301,#ffcf4d);color:#5a3d00}
+  .cal-heat .d.review{background:linear-gradient(135deg,#2ecc71,#5fd99a);color:#fff}
+  .cal-heat .d .dot.new{background:#5b8cff}
+  .cal-heat .d .dot.done{background:#f5b301}
+  .cal-heat .d .dot.review{background:#2ecc71}
   .cal-legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
   .cal-legend span{display:inline-flex;align-items:center;gap:5px}
   .cal-legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
@@ -338,7 +344,6 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   <section class="panel" id="lib">
     <div class="card">
       <h2>🔍 联网查词 / 翻译</h2>
-      <p class="small muted">输入英文单词，联网核查它的音标并给出中文翻译（数据源：免费公开词典 + 翻译接口）。需要联网。</p>
       <div class="row">
         <input id="olInput" placeholder="输入英文单词，如 review" style="flex:1">
         <button class="btn" id="olBtn">查词</button>
@@ -2404,8 +2409,9 @@ function renderStats(){
   const due=WORDS.filter(dueIn).length;
   const learned=WORDS.filter(w=>w.reviewCount>0).length;
   const p=currentBookProgress();
+  const newToday=PACK?PACK.ids.length:0;
   document.getElementById("statbar").innerHTML=
-    stat(total,"词库总数")+statClick(due,"待复习 · 去练","startDue()")+stat(learned,"已练过")+statProg(p)+statClick(STREAK.count,"连续天数","openStreakCalendar()");
+    stat(newToday,"📌 今日新词")+statClick(due,"⏰ 需复习","startDue()")+statClick(STREAK.count,"🔥 连续天数","openStreakCalendar()")+statProg(p);
 }
 function stat(n,l){return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 function statClick(n,l,fn){return `<div class="stat click" onclick="${fn}"><div class="n">${n}</div><div class="l">${l} ›</div></div>`;}
@@ -2416,14 +2422,20 @@ let calMonth=0;
 let calSelected=null;
 function dayStudyInfo(key){
   let cnt=0,know=0,fuzzy=0,no=0,words=[];
+  let packCnt=0,dueCnt=0;const packWords=new Set(),packKnow=new Set();
   WORDS.forEach(w=>w.history.forEach(h=>{
     if(h.act==="review" && dkey(h.t)===key){
       cnt++;
       if(h.res==="know")know++; else if(h.res==="fuzzy")fuzzy++; else no++;
       if(words.length<30 && !words.includes(w.term)) words.push(w.term);
+      if(h.scope==="pack"){ packCnt++; packWords.add(w.id); if(h.res==="know") packKnow.add(w.id); }
+      else if(h.scope==="due") dueCnt++;
     }
   }));
-  return {cnt,know,fuzzy,no,words};
+  let state="none";
+  if(packCnt>0) state=(packWords.size>0 && packKnow.size===packWords.size)?"done":"new";
+  else if(dueCnt>0) state="review";
+  return {cnt,know,fuzzy,no,words,packCnt,dueCnt,packWords:packWords.size,packKnow:packKnow.size,state};
 }
 function openStreakCalendar(){
   calSelected=null;
@@ -2452,17 +2464,22 @@ function renderCalModal(){
     const inMonth=d.getMonth()===m;
     const isToday=key===tkey;
     let cls="d";
-    if(info.cnt>0) cls+=" studied";
+    if(info.state==="done") cls+=" done";
+    else if(info.state==="new") cls+=" new";
+    else if(info.state==="review") cls+=" review";
     else if(inMonth) cls+=" nostudy";
     if(!inMonth) cls+=" out";
     if(isToday) cls+=" today";
     if(key===calSelected) cls+=" selected";
-    grid+=`<div class="${cls}" onclick="calDay('${key}',this)">${d.getDate()}${info.cnt>0?`<span class="dot"></span>`:""}</div>`;
+    const dotCls = info.state==="done"?"done":info.state==="new"?"new":info.state==="review"?"review":"";
+    grid+=`<div class="${cls}" onclick="calDay('${key}',this)">${d.getDate()}${info.state!=="none"?`<span class="dot ${dotCls}"></span>`:""}</div>`;
     d.setDate(d.getDate()+1);
   }
   html+=grid+`</div>
     <div class="cal-legend">
-      <span><i style="background:linear-gradient(135deg,var(--accent),var(--accent2))"></i>学过</span>
+      <span><i style="background:linear-gradient(135deg,#5b8cff,#7aa2ff)"></i>已学新词</span>
+      <span><i style="background:linear-gradient(135deg,#f5b301,#ffcf4d)"></i>已学完</span>
+      <span><i style="background:linear-gradient(135deg,#2ecc71,#5fd99a)"></i>已复习</span>
       <span><i style="background:#ffe3e6"></i>未学</span>
       <span><i style="background:#fff;outline:2px solid #ffd166"></i>今天</span>
       <span><i style="background:#fff;outline:3px solid var(--accent)"></i>已选</span>
@@ -2476,7 +2493,8 @@ function calStep(dir){ calMonth+=dir; renderCalModal(); }
 function calReportHTML(key){
   const info=dayStudyInfo(key);
   if(info.cnt===0) return `${esc(key)}：这天没有学习记录 🌙`;
-  return `<b>${esc(key)} 学习报告</b><br>复习 ${info.cnt} 次 · 认识 ${info.know} · 模糊 ${info.fuzzy} · 不认识 ${info.no}<br>所学单词：${(info.words.slice(0,20).map(esc).join("、")||"—")}${info.words.length>20?"…":""}`;
+  const st=info.state==="done"?"✅ 已学完":info.state==="new"?"📘 已学新词":info.state==="review"?"🔁 已复习":"📚 学习";
+  return `<b>${esc(key)} ${st}</b><br>复习 ${info.cnt} 次 · 认识 ${info.know} · 模糊 ${info.fuzzy} · 不认识 ${info.no}<br>所学单词：${(info.words.slice(0,20).map(esc).join("、")||"—")}${info.words.length>20?"…":""}`;
 }
 function calDay(key,cell){
   calSelected=key;
@@ -2788,7 +2806,7 @@ function renderPackUI(){
       <button class="btn ${dueList.length?'alt':'ghost'}" ${dueList.length?'':'disabled'} onclick="startDue()">▶ 去复习</button>
     </div>
     <div class="addline" style="margin-top:6px">根据<b>遗忘曲线</b>（掌握度越低复习间隔越短：＜30%→1天、＜60%→2天、＜85%→4天、其余→7天），以下已学单词<b>今天该复习</b>了。点单词看解释。</div>
-    <div class="packwords" style="margin-top:10px">${dueList.length?dueList.slice(0,30).map(w=>`<span class="pw" style="border-color:var(--warn);color:var(--bad)" onclick="showWord('${w.id}')">${esc(w.term)}</span>`).join(""):`<span class="muted small">🎉 今天没有要复习的词，超前完成！</span>`}</div>
+    <div class="packwords" style="margin-top:10px">${dueList.length?dueList.slice(0,3).map(w=>`<span class="pw" style="border-color:var(--warn);color:var(--bad)" onclick="showWord('${w.id}')">${esc(w.term)}</span>`).join("")+(dueList.length>3?`<span class="muted small"> …还有 ${dueList.length-3} 个</span>`:""):`<span class="muted small">🎉 今天没有要复习的词，超前完成！</span>`}</div>
   </div>`;
   /* 薄弱词巩固 */
   html+=`<div class="card">
@@ -2796,7 +2814,7 @@ function renderPackUI(){
       <h2 style="margin:0">⚠️ 薄弱词巩固（${weak.length}）</h2>
       <button class="btn ${weak.length?'alt':'ghost'}" ${weak.length?'':'disabled'} onclick="startWeak()">▶ 开始巩固</button>
     </div>
-    <div class="packwords" style="margin-top:10px">${weak.length?weak.map(w=>`<span class="pw" style="border-color:var(--warn);color:var(--bad)" onclick="showWord('${w.id}')">${esc(w.term)}</span>`).join(""):`<span class="muted small">目前没有薄弱词，棒棒的！</span>`}</div>
+    <div class="packwords" style="margin-top:10px">${weak.length?weak.slice(0,3).map(w=>`<span class="pw" style="border-color:var(--warn);color:var(--bad)" onclick="showWord('${w.id}')">${esc(w.term)}</span>`).join("")+(weak.length>3?`<span class="muted small"> …还有 ${weak.length-3} 个</span>`:""):`<span class="muted small">目前没有薄弱词，棒棒的！</span>`}</div>
     <div class="addline" style="margin-top:8px">点单词可看详细解释；掌握度低于 60% 的单词会列在这里，建议每天重点复习。</div>
   </div>`;
   box.innerHTML=html;
@@ -2890,7 +2908,6 @@ function pvShell(title,inner){
 }
 function renderSession(){
   const a=document.getElementById("practiceView");
-  const top=`<div class="pvmodes">${modeChipsHTML()}</div>`;
   const done=doneOf(SESSION.mode);
   const full=SESSION.fullList||SESSION.list;
   const fullT=full.length;
@@ -2902,12 +2919,11 @@ function renderSession(){
       if(SESSION.scope==="due" && !scopeAllModesDone()){
         /* 待复习：四种方式都通关才算复习完成，还有方式没过 */
         const next=nextModeToPass();
-        a.innerHTML=pvShell(`✅ ${MODE_NAMES[SESSION.mode]} 通关`, top+`
+        a.innerHTML=pvShell(`✅ ${MODE_NAMES[SESSION.mode]} 通关`, `
         <div class="card center done">
           <div class="party">🎉</div>
           <h2>${MODE_ICON[SESSION.mode]} ${MODE_NAMES[SESSION.mode]} 通关！</h2>
           <p class="muted">待复习要<b>四种方式全部答对</b>才算完成，下面还有方式没过～</p>
-          ${modeChipsHTML()}
           <div class="row" style="justify-content:center;margin-top:14px">
             <button class="btn green" onclick="seekMode('${next}')">➡️ 继续练「${MODE_NAMES[next]}」</button>
             <button class="btn ghost" onclick="closePractice()">先退出</button>
@@ -2915,7 +2931,7 @@ function renderSession(){
         </div>`);
       }else{
         const note=(SESSION.scope==="due")?`🎊 四种方式已全部通关，<b>复习完成</b>！`:`这 ${fullT} 个词你<b>全部答对</b>啦${(SESSION.scope==="pack")?"（其他练习方式不受影响）":""}`;
-        a.innerHTML=pvShell(`${MODE_ICON[SESSION.mode]} ${MODE_NAMES[SESSION.mode]} 通关`, top+`
+        a.innerHTML=pvShell(`${MODE_ICON[SESSION.mode]} ${MODE_NAMES[SESSION.mode]} 通关`, `
         <div class="card center done">
           <div class="party">🎉</div>
           <h2>全部答对，${MODE_NAMES[SESSION.mode]} 通关！</h2>
@@ -2924,7 +2940,7 @@ function renderSession(){
         </div>`);
       }
     }else{
-      a.innerHTML=pvShell(`${MODE_ICON[SESSION.mode]} ${MODE_NAMES[SESSION.mode]}`, top+`
+      a.innerHTML=pvShell(`${MODE_ICON[SESSION.mode]} ${MODE_NAMES[SESSION.mode]}`, `
       <div class="card center">
         <div class="party">💪</div>
         <h2>本轮完成！还差 ${unfam.length} 个就通关</h2>
@@ -2942,14 +2958,12 @@ function renderSession(){
     return;
   }
   const w=SESSION.list[SESSION.idx];
-  const prog=Math.round((SESSION.idx)/SESSION.total*100);
-  const head=`<div class="card"><div class="row" style="justify-content:space-between"><span class="muted small">本轮第 ${SESSION.idx+1} / ${SESSION.total} 个 · 已答对 ${passN}/${fullT}</span><span class="pill ${mLevel(w.mastery)}">掌握度 ${w.mastery}% · ${mText(w.mastery)}</span></div><div class="prog"><i style="width:${prog}%"></i></div></div>`;
   let body="";
   if(SESSION.mode==="flash")body=flashCard(w);
   else if(SESSION.mode==="choice")body=choiceCard(w);
   else if(SESSION.mode==="spell")body=spellCard(w);
   else if(SESSION.mode==="listen")body=listenCard(w);
-  a.innerHTML=pvShell(SESSION.title||"练习", top+head+body);
+  a.innerHTML=pvShell(SESSION.title||"练习", body);
 }
 /* 反馈按钮(认识/模糊/不认识)：know=答对(通过)，fuzzy/no=还不熟练，本轮会再练到，直到全部答对才通关 */
 function feedback(res){
@@ -3478,7 +3492,7 @@ function renderStatsPanel(){
 }
 
 /* ============ 家长监控：学习情况统计分析 ============ */
-function dkey(ts){return fmt(ts).slice(0,10);}
+function dkey(ts){if(!ts)return "";const d=new Date(ts);return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
 function pstat(n,l){return `<div class="pstat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 let weakMoreOpen=false;
 function toggleWeakMore(){
