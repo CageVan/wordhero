@@ -3382,8 +3382,11 @@ function showWord(id){
       <button class="btn alt" style="flex:1" onclick="delWord('${w.id}')">🗑 删除</button>
       <button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button>
     </div>`);
-  /* 打开单词详情自动朗读一次 */
-  setTimeout(()=>speak(w.term),320);
+  /* 打开单词详情自动朗读：先读单词，再读例句(例句的演示)；无例句则只读单词 */
+  setTimeout(()=>{
+    speak(w.term);
+    if(w.ex){ setTimeout(()=>speak(w.ex),1100); }
+  },320);
   /* 例句中文缺失时，自动联网翻译并标注来源（查询中已占位，结果回填） */
   if(!w.exCn && w.ex){
     onlineTranslate(w.ex).then(r=>{
