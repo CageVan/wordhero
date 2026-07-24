@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=3;
+window.SITE_VER=4;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -350,7 +350,7 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
     <div class="card">
       <h2>🔍 联网查词 / 翻译</h2>
       <div class="row">
-        <input id="olInput" placeholder="输入英文单词，如 review" style="flex:1">
+        <input id="olInput" placeholder="输入英文单词或中文，如 review / 复习" style="flex:1">
         <button class="btn" id="olBtn">查词</button>
       </div>
       <div id="olStatus" class="small muted" style="margin-top:8px"></div>
@@ -2088,7 +2088,41 @@ async function syncLibFromCloud(quiet){
   const books=res.books||[];
   const sub=subLibs();
   let added=0, updated=0;
-  books.filter(b=>sub.includes(b.name)).forEach(b=>{
+  /* 云端改了书名后，sub 里可能存的是旧名 → 用「旧名匹配云端词」的方式做迁移：
+     遍历云端所有书（不限 sub），若某书词与本地 master 词重合且本地 book 名不同 → 更新为云端新名。
+     同时更新 sub 列表里的旧名为新名。 */
+  const cloudBookNames=new Set(books.map(b=>b.name));
+  books.forEach(b=>{
+    (b.words||[]).forEach(x=>{
+      const term=(x.t||"").trim().toLowerCase(); if(!term) return;
+      const w=WORDS.find(z=>z.term.toLowerCase()===term && z.source==="master");
+      if(w && (w.book||"")!==b.name){
+        /* 本地 master 词的书名与云端不一致 → 同步为云端名称（处理改名） */
+        w.book=b.name; updated++;
+      }
+    });
+  });
+  /* 清理 sub 列表：把已不存在的旧名替换为云端新名（通过词重合判断） */
+  const newSub=[];
+  sub.forEach(oldName=>{
+    if(cloudBookNames.has(oldName)){ newSub.push(oldName); return; } /* 仍存在，保留 */
+    /* 旧名不在云端了 → 找到云端中包含相同词的书名（改名迁移） */
+    const oldWords=WORDS.filter(w=>w.source==="master"&&(w.book||"")===oldName);
+    if(oldWords.length){
+      let migrated=false;
+      books.forEach(b=>{
+        if(migrated) return;
+        const terms=new Set((b.words||[]).map(x=>(x.t||"").trim().toLowerCase()));
+        const overlap=oldWords.filter(w=>terms.has(w.term.toLowerCase()));
+        if(overlap.length>=Math.ceil(oldWords.length*0.5)){ /* 50%以上词重合 → 判定为改名 */
+          newSub.push(b.name); migrated=true;
+        }
+      });
+    }
+  });
+  if(newSub.length!==sub.length || !sub.every((v,i)=>newSub[i]===v)){ subLibsSet(newSub); }
+  /* 正常同步：只同步 sub 中仍然存在的云端书 */
+  books.filter(b=>newSub.includes(b.name)).forEach(b=>{
     (b.words||[]).forEach(x=>{
       const term=(x.t||"").trim().toLowerCase(); if(!term) return;
       const w=WORDS.find(z=>z.term.toLowerCase()===term);
@@ -2379,12 +2413,12 @@ function rebuildUkAudio(){ const m={}; WORDS.forEach(w=>{ if(w&&w.ukAudio) m[(w.
 /* 有道例句代理端点（Supabase Edge Function，需自行部署；未配置云端则留空=不抓例句） */
 function youdaoEp(){ const u=(typeof SB!=="undefined"&&SB&&SB.url)||""; return u? (u.replace(/\/$/,"")+"/functions/v1/youdao-examples") : ""; }
 function ydHeaders(){ const k=(typeof SB!=="undefined"&&SB&&SB.anon)||""; return k?{"apikey":k,"Authorization":"Bearer "+k}:{}; }
-function speak(t){
-  t=(t||"").trim(); if(!t) return;
+function speak(t,onEnd){
+  t=(t||"").trim(); if(!t){ if(typeof onEnd==="function")onEnd(); return; }
   /* 电脑/带英文嗓音的机型：优先系统离线朗读；
      手机 WebView（多数无可用英文嗓音）：直接走在线音频，避免“空转”后才提示联网。 */
-  if(_sysTtsUsable() && tryWebSpeech(t)) return;
-  playOnline(t);
+  if(_sysTtsUsable() && tryWebSpeech(t,onEnd)) return;
+  playOnline(t,onEnd);
 }
 let _voices=[];
 function _loadVoices(){ try{ _voices=(window.speechSynthesis&&window.speechSynthesis.getVoices)?window.speechSynthesis.getVoices():[]; }catch(e){ _voices=[]; } }
@@ -2402,17 +2436,22 @@ function _sysTtsUsable(){
   _loadVoices();
   return !!_pickEnVoice();
 }
-function tryWebSpeech(t){
+function tryWebSpeech(t,onEnd){
   try{
     if(!("speechSynthesis" in window)) return false;
     const u=new SpeechSynthesisUtterance(t);
     u.lang = SPEAK_ACCENT==="uk" ? "en-GB" : "en-US";
     u.rate=0.9; u.pitch=1;
     const v=_pickEnVoice(); if(v) u.voice=v;
+    /* 朗读结束回调（用于串行播放：单词播完→例句） */
+    if(typeof onEnd==="function"){
+      u.onend=()=>{ try{onEnd();}catch(e){} };
+      u.onerror=()=>{ try{onEnd();}catch(e){} };
+    }
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
     return true;
-  }catch(e){ return false; }
+  }catch(e){ if(typeof onEnd==="function"){try{onEnd();}catch(e2){}} return false; }
 }
 /* 多个在线音频源：一个失败自动换下一个，最大化在手机上的成功率。
    单词和整句例句都能读。由 🔊 点击手势触发，绕开 WebView 自动播放限制。 */
@@ -2427,15 +2466,19 @@ function _audioSources(t){
   out.push("https://api.frdic.com/api/v2/speech/speakweb?langid=en&txt="+enc);
   return out;
 }
-function playOnline(t){
+function playOnline(t,onEnd){
   const srcs=_audioSources(t);
   let i=0;
+  let ended=false;
+  function finish(){ if(!ended){ ended=true; if(typeof onEnd==="function"){try{onEnd();}catch(e){}} } }
   (function attempt(){
-    if(i>=srcs.length){ toast("发音失败，请检查手机网络后重试"); return; }
+    if(i>=srcs.length){ toast("发音失败，请检查手机网络后重试"); finish(); return; }
     const url=srcs[i++];
     const a=new Audio(url);
     let done=false;
     const fail=()=>{ if(done) return; done=true; setTimeout(attempt,0); };
+    /* 播放成功后，ended 事件触发 onEnd 回调（串行播放） */
+    a.onended=()=>{ done=true; finish(); };
     a.onerror=fail;
     try{
       const p=a.play();
@@ -3322,7 +3365,7 @@ function renderLib(){
     if(q) stats=stats.filter(s=>s.name.toLowerCase().includes(q));
     if(!stats.length){ if(bb)bb.innerHTML=""; el.innerHTML=`<div class="muted center" style="padding:20px">还没有任何书本，去「➕ 添加」加词吧</div>`; return; }
     stats.sort((a,b)=>b.n-a.n);
-    if(bb) bb.innerHTML=`<button class="bk-tab on" onclick="libSetView('books')">📚 全部书本</button>`;
+    if(bb) bb.innerHTML=`<button class="bk-tab on" onclick="libSetView('books')">📚 本地词库</button>`;
     el.innerHTML=stats.map(s=>{
         const col=gradColor(s.avg);
         return `<div class="lib-book" onclick="libOpenBook('${esc(s.name)}')">
@@ -3341,7 +3384,7 @@ function renderLib(){
   const ws=WORDS.filter(w=>(w.book||"自己添加")===libView);
   let list=ws.filter(w=>(w.term+" "+w.mean).toLowerCase().includes(q));
   if(libSort==="mastery") list=list.slice().sort((a,b)=>b.mastery-a.mastery);
-  if(bb) bb.innerHTML=`<button class="bk-tab" onclick="libSetView('books')">‹ 全部书本</button><button class="bk-tab on">${esc(libView)}</button>`;
+  if(bb) bb.innerHTML=`<button class="bk-tab" onclick="libSetView('books')">‹ 本地词库</button><button class="bk-tab on">${esc(libView)}</button>`;
   if(!list.length){ el.innerHTML=`<div class="muted center" style="padding:20px">这本书里还没有词</div>`; return; }
   const shown=libExpanded?list:list.slice(0,5);
   el.innerHTML=`<div class="lib-sort">
@@ -3417,10 +3460,12 @@ function showWord(id){
       <button class="btn alt" style="flex:1" onclick="delWord('${w.id}')">🗑 删除</button>
       <button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button>
     </div>`);
-  /* 打开单词详情自动朗读：先读单词，再读例句(例句的演示)；无例句则只读单词 */
+  /* 打开单词详情自动朗读：先读单词，单词播完再读例句（串行播放，不再同时） */
   setTimeout(()=>{
-    speak(w.term);
-    if(w.ex){ setTimeout(()=>speak(w.ex),1100); }
+    speak(w.term, ()=>{
+      /* 单词播完后，如果已有例句 → 播例句；如果例句还在抓取中 → refetchEx 完成后会自动播 */
+      if(w.ex){ setTimeout(()=>speak(w.ex),200); }
+    });
   },320);
   /* 例句缺失时，当场联网补全（代理已上线）：取英式音频+日常双语例句回填并演示 */
   if(!w.ex){ refetchEx(w.id); }
@@ -4819,19 +4864,29 @@ document.getElementById("myBtn").onclick=openMyPanel;
 /* ============ [M18 联网查词/翻译 · 第1部分] 在线查词 / 翻译 ============ */
 const OL_DICT="https://api.dictionaryapi.dev/api/v2/entries/en/";
 const OL_TRANS="https://api.mymemory.translated.net/get?langpair=en|zh-CN&q=";
+const OL_TRANS_ZH_EN="https://api.mymemory.translated.net/get?langpair=zh-CN|en&q=";
+/* 检测输入是否包含中文字符 → 中→英方向翻译；否则英→中 */
+function hasChinese(s){ return /[\u4e00-\u9fff]/.test(s||""); }
 async function onlineLookup(term,opts){
   term=(term||"").trim();
   if(!term)return {err:"请输入单词"};
   opts=opts||{};
+  const isZh=hasChinese(term);
   let phon="",zh="",ukAudio="",ex="",exCn="";
-  /* 三路并行：词典(音标+英式音频) / 单词中文翻译 / 有道例句代理(日常向+中文) */
+  /* 中文输入：跳过英文词典(无音标/音频)，走中→英翻译；英文输入：三路并行 */
   const proms=[];
-  proms.push(fetch(OL_DICT+encodeURIComponent(term.toLowerCase())).then(r=>r.json()).catch(()=>null));
-  proms.push(fetch(OL_TRANS+encodeURIComponent(term)).then(r=>r.json()).catch(()=>null));
-  const doEx=(opts.examples!==false)&&!!youdaoEp();
+  if(!isZh){
+    proms.push(fetch(OL_DICT+encodeURIComponent(term.toLowerCase())).then(r=>r.json()).catch(()=>null));
+  }else{
+    proms.push(null); /* 占位：保持 res[0] 为词典结果 */
+  }
+  /* 翻译方向：中文输入→中译英；英文输入→英译中 */
+  const transUrl=isZh?(OL_TRANS_ZH_EN+encodeURIComponent(term)):(OL_TRANS+encodeURIComponent(term));
+  proms.push(fetch(transUrl).then(r=>r.json()).catch(()=>null));
+  const doEx=(opts.examples!==false)&&!!youdaoEp()&&!isZh; /* 中文输入不抓例句（有道例句代理按英文词条目） */
   if(doEx) proms.push(fetch(youdaoEp()+"?q="+encodeURIComponent(term),{headers:ydHeaders()}).then(r=>r.json()).catch(()=>null));
   const res=await Promise.all(proms);
-  const dict=res[0], trans=res[1], yd=doEx?res[2]:null;
+  const dict=isZh?null:res[0], trans=res[1], yd=doEx?res[2]:null;
   if(dict&&Array.isArray(dict)&&dict.length){
     const a=dict[0];
     phon=a.phonetic||(a.phonetics||[]).map(p=>p.text).filter(Boolean)[0]||"";
@@ -4843,16 +4898,31 @@ async function onlineLookup(term,opts){
     ex=(yd.examples[0].en||"").trim();
     exCn=(yd.examples[0].zh||"").trim();
   }
-  if(!phon&&!zh)return {err:"没查到这个词，请检查拼写或网络后重试"};
-  return {term,phon,zh,ukAudio,ex,exCn};
+  if(!phon&&!zh)return {err:isZh?"没查到对应的英文翻译，请检查输入或网络后重试":"没查到这个词，请检查拼写或网络后重试"};
+  return {term,phon,zh,ukAudio,ex,exCn,isZh};
 }
 function lookupHtml(r){
   if(r.err)return `<div class="info" style="color:var(--bad)">⚠️ ${esc(r.err)}</div>`;
-  let h=`<div style="font-size:22px;font-weight:900;color:var(--accent);display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(r.term)} ${r.phon?`<span class="muted small" style="font-weight:400;color:#8a5cff;font-size:15px">${esc(r.phon)}</span>`:""} <button class="spk" onclick="speak('${esc(r.term)}')">🔊</button></div>`;
+  const isZh=!!r.isZh;
+  /* 中文输入：翻译结果显示「英文翻译」标签；英文输入：显示单词+音标+中文翻译+例句 */
+  let h=`<div style="font-size:22px;font-weight:900;color:var(--accent);display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(r.term)} ${r.phon?`<span class="muted small" style="font-weight:400;color:#8a5cff;font-size:15px">${esc(r.phon)}</span>`:""} ${!isZh?`<button class="spk" onclick="speak('${esc(r.term)}')">🔊</button>`:""}</div>`;
   if(r.zh)h+=`<div class="acc" style="margin-top:10px">
-    <div class="acc-h" onclick="toggleAcc(this)"><span>🌐 中文翻译</span><i class="acc-ar">›</i></div>
-    <div class="acc-b"><span class="ol-tag">中文</span>${esc(r.zh)}</div></div>`;
-  if(!r.zh)h+=`<div class="muted small" style="margin-top:8px">只查到音标，没拿到中文翻译，可以再试一次。</div>`;
+    <div class="acc-h" onclick="toggleAcc(this)"><span>${isZh?"🌐 英文翻译":"🌐 中文翻译"}</span><i class="acc-ar">›</i></div>
+    <div class="acc-b"><span class="ol-tag">${isZh?"英文":"中文"}</span>${esc(r.zh)}</div></div>`;
+  if(!r.zh)h+=`<div class="muted small" style="margin-top:8px">${isZh?"只查到部分信息，没拿到英文翻译，可以再试一次。":"只查到音标，没拿到中文翻译，可以再试一次。"}</div>`;
+  /* 英文输入：显示例句区（有则显示，无则占位提示） */
+  if(!isZh){
+    if(r.ex){
+      h+=`<div class="acc" style="margin-top:10px">
+        <div class="acc-h" onclick="toggleAcc(this)"><span>📘 例句</span><i class="acc-ar">›</i></div>
+        <div class="acc-b">
+          <div class="ex-en" style="margin-bottom:4px">${esc(r.ex)} <button class="spk" onclick="speak('${esc(r.ex)}')">🔊</button></div>
+          ${r.exCn?`<div class="ex-cn muted small">${esc(r.exCn)}</div>`:""}
+        </div></div>`;
+    }else{
+      h+=`<div class="muted small" style="margin-top:8px">📘 暂无例句</div>`;
+    }
+  }
   return h;
 }
 /* 翻译整句中文（用于例句中文释义缺失时自动补全），返回带来源 */
@@ -4882,23 +4952,34 @@ function showLookup(term,mode){
       if(status)status.textContent="✅ 已查询（"+term+"）";
       return;
     }
+    /* 中文输入：翻译结果 r.zh 是英文 → 作为单词 term；原始中文作为释义 mean。
+       英文输入：term 不变，r.zh 作为中文释义。 */
+    const isZh=!!r.isZh;
+    const wordTerm=isZh?(r.zh||""):term;
+    const wordMean=isZh?term:(r.zh||"");
     if(mode==="fill"){
       btns.innerHTML=`<button class="btn green" style="flex:1" id="olFillBtn">✏️ 填入上面的输入框</button>
-        <button class="btn" style="flex:1" onclick="speak('${esc(term)}')">🔊 听发音</button>
+        ${!isZh?`<button class="btn" style="flex:1" onclick="speak('${esc(wordTerm)}')">🔊 听发音</button>`:""}
         <button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button>`;
       document.getElementById("olFillBtn").onclick=()=>{
-        if(r.zh)document.getElementById("awMean").value=r.zh;
-        toast("已填好释义，检查一下再点添加");closeModal();
+        if(!isZh){
+          if(r.zh)document.getElementById("awMean").value=r.zh;
+          if(wordTerm)document.getElementById("awTerm").value=wordTerm;
+        }else{
+          if(r.zh)document.getElementById("awTerm").value=r.zh;
+          document.getElementById("awMean").value=term;
+        }
+        toast("已填好，检查一下再点添加");closeModal();
       };
     }else{
       btns.innerHTML=`<button class="btn green" style="flex:1" id="olAddBtn">➕ 加入我的词库</button>
-        <button class="btn" style="flex:1" onclick="speak('${esc(term)}')">🔊 听发音</button>
+        ${!isZh?`<button class="btn" style="flex:1" onclick="speak('${esc(wordTerm)}')">🔊 听发音</button>`:""}
         <button class="btn ghost" style="flex:1" onclick="closeModal()">关闭</button>`;
       document.getElementById("olAddBtn").onclick=()=>{
+        if(!wordTerm){toast("没有可添加的单词");return;}
         const book=resolveAddBook();
-        if(findExact(term,book)){toast(term+" 在「"+book+"」里已经存在啦");closeModal();return;}
-        const mean=r.zh||"";
-        const w=addSingle(term,mean,r.phon,r.ex,r.exCn,undefined,r.ukAudio);
+        if(findExact(wordTerm,book)){toast(wordTerm+" 在「"+book+"」里已经存在啦");closeModal();return;}
+        const w=addSingle(wordTerm,wordMean,r.phon,r.ex,r.exCn,undefined,r.ukAudio);
         if(w)closeModal();
       };
     }
