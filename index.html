@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=6;
+window.SITE_VER=7;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -3900,6 +3900,24 @@ function confirmDialog(title,msg,onYes){
   const cb=document.getElementById("cfmYes");
   if(cb)cb.onclick=()=>{ const fn=onYes; closeModal(); if(typeof fn==="function") fn(); };
 }
+/* 自定义输入弹窗（替代浏览器 prompt()，避免手机 WebView 中 prompt 被直接驳回导致“点击无反应”） */
+function inputDialog(title,defVal,onOk){
+  const html=`<div class="card" style="padding:18px;max-width:340px">
+    <h3 style="margin:0 0 8px">${esc(title||"请输入")}</h3>
+    <input id="inDlgVal" value="${esc(defVal||"")}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px;font-size:15px" placeholder="">
+    <div class="row" style="gap:10px;margin-top:14px">
+      <button class="btn ghost" style="flex:1" onclick="closeModal()">取消</button>
+      <button class="btn green" id="inDlgOk" style="flex:1">确定</button>
+    </div>
+  </div>`;
+  openModal(html);
+  const inp=document.getElementById("inDlgVal");
+  const ok=document.getElementById("inDlgOk");
+  if(inp) setTimeout(()=>{try{inp.focus();inp.select();}catch(e){}},60);
+  const submit=()=>{ const v=(inp&&inp.value||"").trim(); closeModal(); if(typeof onOk==="function") onOk(v); };
+  if(ok) ok.onclick=submit;
+  if(inp) inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } });
+}
 /* 手风琴折叠：点击标题展开/收起详情 */
 function toggleAcc(h){
   const item=h.parentElement;
@@ -4502,39 +4520,47 @@ function openBookManager(){
       return;
     }
     el.innerHTML=list.map(([b,s])=>`<div style="display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid var(--line)">
-      <b style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b)}</b>
-      <span class="muted small">${s.n}词${s.l?`·🔒${s.l}`:""}</span>
-      <button class="btn ghost" data-rename="${esc(b)}" style="padding:4px 8px;font-size:12px">✏️</button>
-      <button class="btn ghost" data-del="${esc(b)}" style="padding:4px 8px;font-size:12px;color:#e0524d">🗑</button>
+      <b style="flex:1;min-width:0;word-break:break-word;line-height:1.35;font-size:14px">${esc(b)}</b>
+      <span class="muted small" style="flex:0 0 auto">${s.n}词${s.l?`·🔒${s.l}`:""}</span>
+      <button class="btn ghost" data-rename="${esc(b)}" style="padding:4px 8px;font-size:12px;flex:0 0 auto">✏️</button>
+      <button class="btn ghost" data-del="${esc(b)}" style="padding:4px 8px;font-size:12px;color:#e0524d;flex:0 0 auto">🗑</button>
     </div>`).join("");
     el.querySelectorAll("[data-rename]").forEach(btn=>btn.onclick=()=>{
       const old=btn.getAttribute("data-rename");
-      const nn=prompt("把「"+old+"」重命名为：",old);
-      if(!nn||nn===old) return;
-      const n=nn.trim(); if(!n) return;
-      if(WORDS.some(w=>(w.book||"自己添加")===n)){
-        if(!confirm("已存在同名词库「"+n+"」，合并后两个书会并到一起（删除的「"+old+"」里所有词会加入「"+n+"」）。\n继续吗？")) return;
-      }
-      let cnt=0;
-      WORDS.forEach(w=>{ if((w.book||"(无词库)")===old){ w.book=n; cnt++; } });
-      save(); renderStats(); renderLib(); renderPackUI();
-      if(typeof cloudUpload==="function") cloudUpload(true);
-      render();
-      toast("已重命名「"+old+"」→「"+n+"」（"+cnt+" 词）");
+      inputDialog("重命名书本", old, (n)=>{
+        if(!n||n===old) return;
+        if(WORDS.some(w=>(w.book||"自己添加")===n)){
+          confirmDialog("合并提示","已存在同名词库「"+n+"」，合并后两个书会并到一起（「"+old+"」里所有词会加入「"+n+"」）。\n确定继续吗？", ()=>{
+            let cnt=0;
+            WORDS.forEach(w=>{ if((w.book||"(无词库)")===old){ w.book=n; cnt++; } });
+            save(); renderStats(); renderLib(); renderPackUI();
+            if(typeof cloudUpload==="function") cloudUpload(true);
+            render();
+            toast("已重命名「"+old+"」→「"+n+"」（"+cnt+" 词）");
+          });
+          return;
+        }
+        let cnt=0;
+        WORDS.forEach(w=>{ if((w.book||"(无词库)")===old){ w.book=n; cnt++; } });
+        save(); renderStats(); renderLib(); renderPackUI();
+        if(typeof cloudUpload==="function") cloudUpload(true);
+        render();
+        toast("已重命名「"+old+"」→「"+n+"」（"+cnt+" 词）");
+      });
     });
     el.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=async ()=>{
       const b=btn.getAttribute("data-del");
       const cnt=WORDS.filter(w=>(w.book||"(无词库)")===b).length;
       if(!cnt){ toast("该书没有词"); return; }
-      if(!confirm("⚠️ 删除书本「"+b+"」将清空 "+cnt+" 个单词，确定？")) return;
-      if(!confirm("⚠️ 再次确认：清空「"+b+"」不可恢复，确定继续？")) return;
-      const removed=WORDS.filter(w=>(w.book||"(无词库)")===b);
-      WORDS=WORDS.filter(w=>(w.book||"(无词库)")!==b);
-      save(); renderStats(); renderLib(); renderPackUI();
-      /* 同步云端（带 editorDeletedIds 让其他设备也删除） */
-      await cloudUploadWithDeleted(removed.map(w=>w.id).filter(Boolean));
-      render();
-      toast("已清空「"+b+"」："+removed.length+" 词");
+      confirmDialog("删除书本","⚠️ 删除书本「"+b+"」将清空 "+cnt+" 个单词，不可恢复。\n确定继续吗？", async ()=>{
+        const removed=WORDS.filter(w=>(w.book||"(无词库)")===b);
+        WORDS=WORDS.filter(w=>(w.book||"(无词库)")!==b);
+        save(); renderStats(); renderLib(); renderPackUI();
+        /* 同步云端（带 editorDeletedIds 让其他设备也删除） */
+        await cloudUploadWithDeleted(removed.map(w=>w.id).filter(Boolean));
+        render();
+        toast("已清空「"+b+"」："+removed.length+" 词");
+      });
     });
   }
   function addBook(){
@@ -4542,19 +4568,13 @@ function openBookManager(){
     const v=(el.value||"").trim(); if(!v){ toast("请输入书名"); return; }
     if(WORDS.some(w=>(w.book||"自己添加")===v)){ toast("已存在同名书，直接切换学习即可"); el.value=""; return; }
     el.value="";
-    /* 弹一个轻提示引导去添加（书本是按 book 字段聚合的，没词就不显示） */
-    if(confirm("已新建书本「"+v+"」。\n点确定去「➕ 添加」页加第一个词，点取消留在本页。")){
+    /* 先建书，再问是否去添加（自定义弹窗替代 confirm，避免手机 WebView 驳回） */
+    customBooksAdd(v);
+    confirmDialog("新书已建："+v,"是否现在去「➕ 添加」页加第一个词？\n点确认去添加；点取消留在本页。", ()=>{
       closeModal();
       if(typeof addBookState!=="undefined"){ addBookState.picked=v; }
-      customBooksAdd(v);
       goAdd();
-  }else{
-    if(typeof addBookState!=="undefined"){
-      addBookState.custom=addBookState.custom||[];
-      if(!addBookState.custom.includes(v)) addBookState.custom.push(v);
-    }
-    customBooksAdd(v);
-  }
+    });
   }
   document.getElementById("bmAdd").onclick=addBook;
   const bmCloud=document.getElementById("bmCloud"); if(bmCloud) bmCloud.onclick=openCloudLibSubscribe;
