@@ -1,4 +1,4 @@
-const CACHE = "wordhero-v14";
+const CACHE = "wordhero-v16";
 const FILES = ["index.html", "manifest.json", "icon.svg", "wordhero-icon.png"];
 
 self.addEventListener("install", e => {

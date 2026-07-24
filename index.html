@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=4;
+window.SITE_VER=6;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -2086,43 +2086,37 @@ async function syncLibFromCloud(quiet){
   const res=await cloudLibGet();
   if(!res.ok){ if(!quiet) toast("总控词库同步失败："+(res.err||res.status||"")); return; }
   const books=res.books||[];
-  const sub=subLibs();
-  let added=0, updated=0;
-  /* 云端改了书名后，sub 里可能存的是旧名 → 用「旧名匹配云端词」的方式做迁移：
-     遍历云端所有书（不限 sub），若某书词与本地 master 词重合且本地 book 名不同 → 更新为云端新名。
-     同时更新 sub 列表里的旧名为新名。 */
   const cloudBookNames=new Set(books.map(b=>b.name));
-  books.forEach(b=>{
-    (b.words||[]).forEach(x=>{
-      const term=(x.t||"").trim().toLowerCase(); if(!term) return;
-      const w=WORDS.find(z=>z.term.toLowerCase()===term && z.source==="master");
-      if(w && (w.book||"")!==b.name){
-        /* 本地 master 词的书名与云端不一致 → 同步为云端名称（处理改名） */
-        w.book=b.name; updated++;
-      }
-    });
-  });
-  /* 清理 sub 列表：把已不存在的旧名替换为云端新名（通过词重合判断） */
-  const newSub=[];
+  let sub=subLibs();
+  /* ① 改名迁移：只针对「已订阅(sub)」的书。sub 里某个旧名在云端已不存在时，
+        按词重合(≥50%)找到云端新名，把本地这些 master 词的书名改过去，sub 条目也改为新名。
+        找不到对应云端书的旧 sub 条目直接丢弃（相关词会在③被清理）。
+        —— 注意：只处理已订阅的书，绝不碰未订阅云端书的词。 */
+  let changed=false;
+  const newSub=[]; const used=new Set();
   sub.forEach(oldName=>{
-    if(cloudBookNames.has(oldName)){ newSub.push(oldName); return; } /* 仍存在，保留 */
-    /* 旧名不在云端了 → 找到云端中包含相同词的书名（改名迁移） */
-    const oldWords=WORDS.filter(w=>w.source==="master"&&(w.book||"")===oldName);
+    if(cloudBookNames.has(oldName)){ if(!used.has(oldName)){ newSub.push(oldName); used.add(oldName); } return; }
+    const oldWords=WORDS.filter(w=>w.source==="master" && (w.book||"")===oldName);
+    let found=null;
     if(oldWords.length){
-      let migrated=false;
-      books.forEach(b=>{
-        if(migrated) return;
+      for(const b of books){
+        if(used.has(b.name)) continue;
         const terms=new Set((b.words||[]).map(x=>(x.t||"").trim().toLowerCase()));
         const overlap=oldWords.filter(w=>terms.has(w.term.toLowerCase()));
-        if(overlap.length>=Math.ceil(oldWords.length*0.5)){ /* 50%以上词重合 → 判定为改名 */
-          newSub.push(b.name); migrated=true;
-        }
-      });
+        if(overlap.length>=Math.ceil(oldWords.length*0.5)){ found=b.name; break; }
+      }
     }
+    if(found){
+      if(!used.has(found)){ newSub.push(found); used.add(found); }
+      oldWords.forEach(w=>{ w.book=found; });
+      changed=true;
+    }
+    /* 找不到对应云端书 → 旧 sub 条目丢弃，相关 master 词将在③被清理 */
   });
-  if(newSub.length!==sub.length || !sub.every((v,i)=>newSub[i]===v)){ subLibsSet(newSub); }
-  /* 正常同步：只同步 sub 中仍然存在的云端书 */
-  books.filter(b=>newSub.includes(b.name)).forEach(b=>{
+  if(changed){ subLibsSet(newSub); sub=newSub; }
+  /* ② 同步已订阅的云端书（只同步 sub 里的）—— 未订阅的云端书不会进入 WORDS */
+  let added=0, updated=0;
+  books.filter(b=>sub.includes(b.name)).forEach(b=>{
     (b.words||[]).forEach(x=>{
       const term=(x.t||"").trim().toLowerCase(); if(!term) return;
       const w=WORDS.find(z=>z.term.toLowerCase()===term);
@@ -2134,8 +2128,15 @@ async function syncLibFromCloud(quiet){
       }
     });
   });
-  if(added||updated) save();
-  if(!quiet && (added||updated)) toast("☁ 已同步云端共用词库（+"+added+" / 更新"+updated+"）");
+  /* ③ 清理：移除「未订阅云端书」的 master 词 —— 没“添加到本地”的云词库，本地不显示 */
+  const before=WORDS.length;
+  WORDS=WORDS.filter(w=> !(w.source==="master" && !sub.includes(w.book||"")) );
+  const removed=before-WORDS.length;
+  if(added||updated||removed||changed) save();
+  let msg="";
+  if(added||updated) msg+="（+"+added+" / 更新"+updated+"）";
+  if(removed) msg+="；清理未订阅云端词 "+removed;
+  if(!quiet && (added||updated||removed||changed)) toast("☁ 已同步云端共用词库"+msg);
 }
 
 /* ============ [M02 云词库·管理员 · 第2部分] 云端共用词库（管理员密码闸 + 学生订阅） ============ */
@@ -2443,10 +2444,14 @@ function tryWebSpeech(t,onEnd){
     u.lang = SPEAK_ACCENT==="uk" ? "en-GB" : "en-US";
     u.rate=0.9; u.pitch=1;
     const v=_pickEnVoice(); if(v) u.voice=v;
-    /* 朗读结束回调（用于串行播放：单词播完→例句） */
+    /* 朗读结束回调（用于串行播放：单词播完→例句）。
+       用 once 守卫：Chrome 等浏览器 onend / onerror 可能重复触发，
+       不加守卫会导致例句被排程两次、连播两遍。 */
+    let ended=false;
+    const done=()=>{ if(ended) return; ended=true; if(typeof onEnd==="function"){ try{onEnd();}catch(e){} } };
     if(typeof onEnd==="function"){
-      u.onend=()=>{ try{onEnd();}catch(e){} };
-      u.onerror=()=>{ try{onEnd();}catch(e){} };
+      u.onend=done;
+      u.onerror=done;
     }
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
@@ -3365,7 +3370,7 @@ function renderLib(){
     if(q) stats=stats.filter(s=>s.name.toLowerCase().includes(q));
     if(!stats.length){ if(bb)bb.innerHTML=""; el.innerHTML=`<div class="muted center" style="padding:20px">还没有任何书本，去「➕ 添加」加词吧</div>`; return; }
     stats.sort((a,b)=>b.n-a.n);
-    if(bb) bb.innerHTML=`<button class="bk-tab on" onclick="libSetView('books')">📚 本地词库</button>`;
+    if(bb) bb.innerHTML=`<button class="bk-tab on" onclick="libSetView('books')">📚 全部书本</button>`;
     el.innerHTML=stats.map(s=>{
         const col=gradColor(s.avg);
         return `<div class="lib-book" onclick="libOpenBook('${esc(s.name)}')">
@@ -3384,7 +3389,7 @@ function renderLib(){
   const ws=WORDS.filter(w=>(w.book||"自己添加")===libView);
   let list=ws.filter(w=>(w.term+" "+w.mean).toLowerCase().includes(q));
   if(libSort==="mastery") list=list.slice().sort((a,b)=>b.mastery-a.mastery);
-  if(bb) bb.innerHTML=`<button class="bk-tab" onclick="libSetView('books')">‹ 本地词库</button><button class="bk-tab on">${esc(libView)}</button>`;
+  if(bb) bb.innerHTML=`<button class="bk-tab" onclick="libSetView('books')">‹ 全部书本</button><button class="bk-tab on">${esc(libView)}</button>`;
   if(!list.length){ el.innerHTML=`<div class="muted center" style="padding:20px">这本书里还没有词</div>`; return; }
   const shown=libExpanded?list:list.slice(0,5);
   el.innerHTML=`<div class="lib-sort">
