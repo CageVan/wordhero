@@ -897,7 +897,7 @@ async function verifyAdmin(pwd){
   try{
     const r=await fetch(c.url+"/rest/v1/rpc/koreanword_verify_admin",{method:"POST",
       headers:Object.assign({},cloudHeaders(c.key),{"Content-Type":"application/json"}),
-      body:JSON.stringify({pwd:pwd})});
+      body:JSON.stringify({in_pwd:pwd})});
     if(!r.ok){
       let msg=""; try{const j=await r.json(); msg=(j&&(j.message||j.hint))||"";}catch(e){}
       // RPC 不存在（建表 SQL 未跑）→ 云端词库未初始化
