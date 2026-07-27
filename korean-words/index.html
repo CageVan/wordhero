@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=3;
+window.SITE_VER=4;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -90,6 +90,12 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   .opt.ok{border-color:var(--good);background:#eafff6}
   .opt.no{border-color:var(--bad);background:#fff0f2}
   .opt:disabled{opacity:1;cursor:default}
+  .comb-jamo{font-size:54px;font-weight:800;line-height:1;min-width:66px;height:80px;border:2px solid var(--line);border-radius:16px;display:flex;align-items:center;justify-content:center;background:#fff}
+  .comb-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .comb-opt{font-size:40px;font-weight:800;padding:14px 0;text-align:center;background:#fff;border:2px solid var(--line);border-radius:16px;cursor:pointer;transition:transform .08s ease,border-color .15s,background .15s}
+  .comb-opt.ok{border-color:var(--good);background:#eafff6}
+  .comb-opt.no{border-color:var(--bad);background:#fff0f2}
+  .comb-opt:disabled{opacity:1;cursor:default}
   .prog{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin:10px 0}
   .prog>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0;transition:width .3s}
   .pill{font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px}
@@ -1657,6 +1663,14 @@ function renderStudyUI(){
     });
     html+=`</div></div>`;
   }
+  /* 🧩 拼读组合模块入口（字母基础之后的关键一步，独立于词包进度） */
+  html+=`<div class="card" style="border:2px solid var(--accent2,#7c5cff)">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2 style="margin:0">🧩 拼读组合（辅音 + 元音 → 音节）</h2>
+      <button class="btn alt" onclick="startCombine()">▶ 开始练习</button>
+    </div>
+    <div class="addline" style="margin-top:6px">韩语的核心是把<b>辅音</b>和<b>元音</b>拼成一个方块音节（ㄱ + ㅏ = 가）。这个模块专门练「看到两个字母，拼出正确音节」，是学完字母后最关键的一步。</div>
+  </div>`;
   /* 今日遗忘预警（遗忘曲线自动规划） */
   html+=`<div class="card warn-card">
     <div class="row" style="justify-content:space-between;align-items:center">
@@ -1841,6 +1855,73 @@ function feedback(res){
   doneOf(SESSION.mode)[w.id]=res;
   touchStreak();save();renderStats();
   SESSION.idx++;renderSession();
+}
+/* ============ [M08b 练习 · 拼读组合] 辅音 + 元音 → 方块音节 ============ */
+/* 初声(19辅音)标准顺序与罗马音（ㅇ 在初声不发音，记为空串） */
+const COMB_CHO=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const COMB_CHO_R={'ㄱ':'g','ㄲ':'kk','ㄴ':'n','ㄷ':'d','ㄸ':'tt','ㄹ':'r','ㅁ':'m','ㅂ':'b','ㅃ':'pp','ㅅ':'s','ㅆ':'ss','ㅇ':'','ㅈ':'j','ㅉ':'jj','ㅊ':'ch','ㅋ':'k','ㅌ':'t','ㅍ':'p','ㅎ':'h'};
+const COMB_JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+const COMB_JUNG_R={'ㅏ':'a','ㅐ':'ae','ㅑ':'ya','ㅒ':'yae','ㅓ':'eo','ㅔ':'e','ㅕ':'yeo','ㅖ':'ye','ㅗ':'o','ㅘ':'wa','ㅙ':'wae','ㅚ':'oe','ㅛ':'yo','ㅜ':'u','ㅝ':'wo','ㅞ':'we','ㅟ':'wi','ㅠ':'yu','ㅡ':'eu','ㅢ':'ui','ㅣ':'i'};
+/* 常见音节→中文释义（仅作反馈补充，没有也能练） */
+const COMB_MEAN={'가':'家 / 去','나':'我','다':'都 / 全部','마':'马','바':'船 / 吧','사':'事 / 四','자':'子 / 睡','차':'车','타':'乘 / 搭','파':'葱','하':'做','아':'啊（语气词）','야':'呀','어':'呃（语气词）','여':'（年轻女性自称）','오':'哦 / 五','요':'（敬语词尾）','우':'雨 / 右','유':'油 / 类','으':'（无实义元音）','이':'这 / 牙','애':'哎','예':'例 / 礼','와':'和 / 哇','워':'哇','위':'上 / 位','외':'外 / 胃','도':'也','노':'老 / 路','소':'牛 / 小','보':'看 / 宝','모':'毛 / 模式','고':'肉','구':'球 / 九','두':'二 / 头','루':'路','수':'水 / 数','주':'周 / 酒','추':'秋','투':'投 / 吐','후':'后 / 呼'};
+/* 按谚文组合规则生成音节：codepoint = 0xAC00 + (初声序*21 + 中声序)*28 */
+function combCompose(c,v){const ci=COMB_CHO.indexOf(c),vj=COMB_JUNG.indexOf(v);if(ci<0||vj<0)return '';return String.fromCharCode(0xAC00+(ci*21+vj)*28);}
+function combRoman(c,v){return (COMB_CHO_R[c]||'')+(COMB_JUNG_R[v]||'');}
+let COMBINE=null;
+function startCombine(){
+  COMBINE={correct:0,total:0};
+  const a=document.getElementById("practiceView");if(a){a.classList.add("show");a.innerHTML="";}
+  document.body.style.overflow="hidden";
+  combineRender();
+}
+function combineRender(){
+  const a=document.getElementById("practiceView");if(!a)return;
+  if(!COMBINE){startCombine();return;}
+  const c=COMB_CHO[Math.floor(Math.random()*COMB_CHO.length)];
+  const v=COMB_JUNG[Math.floor(Math.random()*COMB_JUNG.length)];
+  const target=combCompose(c,v);const rom=combRoman(c,v);const mean=COMB_MEAN[target]||"";
+  const opts=new Set([target]);let guard=0;
+  while(opts.size<4&&guard++<60){let nc=c,nv=v;if(Math.random()<0.5)nc=COMB_CHO[Math.floor(Math.random()*COMB_CHO.length)];else nv=COMB_JUNG[Math.floor(Math.random()*COMB_JUNG.length)];if(nc===c&&nv===v)continue;const s=combCompose(nc,nv);if(s)opts.add(s);}
+  const arr=[...opts].sort(()=>Math.random()-0.5);
+  COMBINE.cur={c,v,target,rom,mean,arr};
+  const score=COMBINE.correct+"/"+COMBINE.total;
+  a.innerHTML=pvShell("🧩 拼读组合　<span class='muted small'>答对 "+score+"</span>",`
+    <div class="card center">
+      <div class="addline" style="margin-bottom:4px">把下面两个字母拼成一个<b>方块音节</b>（初声 + 中声）</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin:10px 0">
+        <div class="comb-jamo">${c}</div><div style="font-size:32px;color:var(--muted)">+</div>
+        <div class="comb-jamo">${v}</div><div style="font-size:32px;color:var(--muted)">=</div>
+        <div class="comb-jamo" style="border-style:dashed;color:var(--accent)">?</div>
+      </div>
+      <h2 style="margin:8px 0 4px">拼成哪个音节？</h2>
+      <div class="comb-opts">${arr.map(s=>'<button class="comb-opt" onclick="combinePick(\''+s+'\',this)">'+s+'</button>').join("")}</div>
+      <div id="combMsg" class="small" style="margin-top:12px;text-align:center;font-weight:800;min-height:22px"></div>
+      <div class="row" style="margin-top:12px;justify-content:center;gap:10px">
+        <button class="speak" onclick="speak('${target}')" title="听这个音节的发音">🔊 听答案</button>
+        <button class="btn ghost" onclick="closePractice()">退出</button>
+      </div>
+    </div>`);
+}
+function combinePick(s,el){
+  if(!COMBINE||!COMBINE.cur)return;
+  const cur=COMBINE.cur;const correct=(s===cur.target);
+  COMBINE.total++;if(correct)COMBINE.correct++;
+  [...document.querySelectorAll(".comb-opt")].forEach(b=>b.disabled=true);
+  el.classList.add(correct?"ok":"no");
+  if(!correct){[...document.querySelectorAll(".comb-opt")].forEach(b=>{if(b.textContent===cur.target)b.classList.add("ok");});}
+  const msg=document.getElementById("combMsg");
+  if(msg){
+    const romline=cur.rom?'<div class="mean" style="font-size:14px;color:var(--accent)">罗马音：'+cur.rom+'</div>':"";
+    const meanline=cur.mean?'<div class="mean">意思：'+cur.mean+'</div>':"";
+    msg.innerHTML=correct
+      ?'<span style="color:var(--good)">✅ 正确！'+cur.target+' = '+(cur.rom||"")+'</span>'+romline+meanline
+        +'<div class="advice">📌 '+esc(cur.c)+' + '+esc(cur.v)+' 拼出 <b>'+cur.target+'</b></div>'
+        +'<button class="btn" style="margin-top:10px" onclick="combineRender()">下一题 →</button>'
+      :'<span style="color:var(--bad)">❌ 正确答案：'+cur.target+'</span>'+romline+meanline
+        +'<div class="advice">📌 '+esc(cur.c)+' + '+esc(cur.v)+' 拼出 <b>'+cur.target+'</b>（'+(cur.rom||"")+'）</div>'
+        +'<button class="btn" style="margin-top:10px" onclick="combineRender()">下一题 →</button>';
+  }
+  setTimeout(()=>{if(COMBINE)speak(cur.target);},200);
 }
 /* 闪卡 */
 function flashCard(w){
