@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=7;
+window.SITE_VER=8;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -1163,8 +1163,22 @@ function rebuildUkAudio(){ const m={}; WORDS.forEach(w=>{ if(w&&w.ukAudio) m[(w.
 /* 有道例句代理端点（Supabase Edge Function，需自行部署；未配置云端则留空=不抓例句） */
 function youdaoEp(){ const u=(typeof SB!=="undefined"&&SB&&SB.url)||""; return u? (u.replace(/\/$/,"")+"/functions/v1/youdao-examples") : ""; }
 function ydHeaders(){ const k=(typeof SB!=="undefined"&&SB&&SB.anon)||""; return k?{"apikey":k,"Authorization":"Bearer "+k}:{}; }
+/* 韩语字母（jamo，非完整音节）没有 TTS 发音，喂给在线音频会“搜索不到”失败。
+   把它们映射成官方字母名韩文（기역/니은/아…）再读——这些本身就是可发音的韩文。 */
+const JAMO_NAME={
+  "ㄱ":"기역","ㄲ":"쌍기역","ㄴ":"니은","ㄷ":"디귿","ㄸ":"쌍디귿","ㄹ":"리을",
+  "ㅁ":"미음","ㅂ":"비읍","ㅃ":"쌍비읍","ㅅ":"시옷","ㅆ":"쌍시옷","ㅇ":"이응",
+  "ㅈ":"지읒","ㅉ":"쌍지읒","ㅊ":"치읓","ㅋ":"키읔","ㅌ":"티읕","ㅍ":"피읖","ㅎ":"히읗",
+  "ㅏ":"아","ㅑ":"야","ㅓ":"어","ㅕ":"여","ㅗ":"오","ㅛ":"요","ㅜ":"우","ㅠ":"유",
+  "ㅡ":"으","ㅣ":"이","ㅐ":"애","ㅒ":"얘","ㅔ":"에","ㅖ":"예","ㅘ":"와","ㅙ":"왜",
+  "ㅚ":"외","ㅝ":"워","ㅞ":"웨","ㅟ":"위","ㅢ":"의"
+};
+function _isAllJamo(s){ if(!s) return false; for(const ch of s){ if(!(ch in JAMO_NAME)) return false; } return true; }
+function _jamoName(s){ let r=""; for(const ch of s){ r+=(JAMO_NAME[ch]||ch); } return r; }
 function speak(t,onEnd){
   t=(t||"").trim(); if(!t){ if(typeof onEnd==="function")onEnd(); return; }
+  /* 韩语字母（jamo）无 TTS 发音 → 转成字母名韩文再读（如 ㄱ→기역、ㅏ→아） */
+  if(_isAllJamo(t)) t=_jamoName(t);
   /* 默认在线韩语真人音频；仅当用户选了系统朗读且设备真带韩语嗓音时才走 speechSynthesis。
      手机 WebView（多数无可用韩语嗓音）：直接走在线音频，避免“空转”后才提示联网。 */
   if(SPEAK_ACCENT!=="online" && _sysTtsUsable() && tryWebSpeech(t,onEnd)) return;
@@ -1209,10 +1223,11 @@ function tryWebSpeech(t,onEnd){
    单词和整句例句都能读。由 🔊 点击手势触发，绕开 WebView 自动播放限制。 */
 function _audioSources(t){
   const enc=encodeURIComponent(t);
-  /* 有道韩语词典真人音频(le=ko)首选；百度 kor TTS 备用。单词和整句例句都能读。 */
+  /* 有道韩语词典真人音频(le=ko)首选；百度 kor TTS 备用；Google 翻译 TTS 兜底（国内可能稍慢）。单词和整句例句都能读。 */
   return [
     "https://dict.youdao.com/dictvoice?le=ko&audio="+enc,
-    "https://fanyi.baidu.com/gettts?lan=kor&text="+enc+"&spd=3&source=web"
+    "https://fanyi.baidu.com/gettts?lan=kor&text="+enc+"&spd=3&source=web",
+    "https://translate.google.com/translate_tts?ie=UTF-8&tl=ko&client=tw-ob&q="+enc
   ];
 }
 function playOnline(t,onEnd){
@@ -1225,13 +1240,16 @@ function playOnline(t,onEnd){
     const url=srcs[i++];
     const a=new Audio(url);
     let done=false;
-    const fail=()=>{ if(done) return; done=true; setTimeout(attempt,0); };
-    /* 播放成功后，ended 事件触发 onEnd 回调（串行播放） */
-    a.onended=()=>{ done=true; finish(); };
+    let timer=null;
+    const fail=()=>{ if(done) return; done=true; if(timer){clearTimeout(timer);timer=null;} try{a.pause();}catch(e){} setTimeout(attempt,0); };
+    /* 播放成功 → ended 触发 onEnd 回调（串行播放：单词播完→例句） */
+    a.onended=()=>{ done=true; if(timer){clearTimeout(timer);timer=null;} finish(); };
     a.onerror=fail;
+    /* 超时保护：部分源返回 200 但无音频（哑播）或卡住，4s 内无 ended/error 则切下一源 */
+    timer=setTimeout(function(){ if(!done){ done=true; try{a.pause();}catch(e){} setTimeout(attempt,0); } },4000);
     try{
       const p=a.play();
-      if(p&&p.then) p.then(()=>{done=true;}).catch(fail);
+      if(p&&p.then) p.then(()=>{}).catch(fail);
     }catch(e){ fail(); }
   })();
 }
