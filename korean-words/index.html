@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=2;
+window.SITE_VER=3;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -673,7 +673,7 @@ function load(){
     const raw=localStorage.getItem(KEY);
     if(raw){const o=JSON.parse(raw);WORDS=o.words||[];STREAK=o.streak||{last:null,count:0};PACK=o.pack||null;return;}
   }catch(e){console.warn(e);}
-  seed();
+  seed(); ensureAlphabetBook();
 }
 function save(){
   try{rebuildUkAudio();}catch(e){}
@@ -726,6 +726,65 @@ function seed(){
   save();
 }
 
+/* ============ [DATA] 韩语字母书：40 字母（19 辅音 + 21 元音）============
+   字段：term=字母, phon=字母名罗马音(拼写练习用), kr=韩文名, mean=中文说明, ex=代表音节, exCn=音节中文 */
+function alphabetSeed(){
+  const d=now();const day=86400000;
+  const A=[
+    ["ㄱ","giyeok","기역 (자음)","辅音 ㄱ，发音近似 g（词首轻、不送气）","가","家 / 去（ga）"],
+    ["ㄴ","nieun","니은 (자음)","辅音 ㄴ，发音 n","나","我（na）"],
+    ["ㄷ","digeut","디귿 (자음)","辅音 ㄷ，发音近似 d（不送气）","다","题 / 给（da）"],
+    ["ㄹ","rieul","리을 (자음)","辅音 ㄹ，发音 r/l（颤音或边音）","라","乐 / 来（ra）"],
+    ["ㅁ","mieum","미음 (자음)","辅音 ㅁ，发音 m","마","马（ma）"],
+    ["ㅂ","bieup","비읍 (자음)","辅音 ㅂ，发音 b（不送气）","바","梨 / 船（ba）"],
+    ["ㅅ","siot","시옷 (자음)","辅音 ㅅ，发音 s","사","事 / 四（sa）"],
+    ["ㅇ","ieung","이응 (자음)","辅音 ㅇ：作初声不发音；作终声发 ng","아","牙（a）"],
+    ["ㅈ","jieut","지읒 (자음)","辅音 ㅈ，发音 j（不送气）","자","子（ja）"],
+    ["ㅊ","chieut","치읓 (자음)","辅音 ㅊ，发音 ch（送气）","차","茶（cha）"],
+    ["ㅋ","kieuk","키읔 (자음)","辅音 ㅋ，发音 k（送气）","카","卡（ka）"],
+    ["ㅌ","tieut","티읕 (자음)","辅音 ㅌ，发音 t（送气）","타","他（ta）"],
+    ["ㅍ","pieup","피읖 (자음)","辅音 ㅍ，发音 p（送气）","파","葱 / 坡（pa）"],
+    ["ㅎ","hieut","히읗 (자음)","辅音 ㅎ，发音 h","하","河 / 下（ha）"],
+    ["ㄲ","ssanggiyeok","쌍기역 (된소리)","紧音 ㄲ，发音 gɡ（用力、不送气）","까","硬 / 岁月（kka）"],
+    ["ㄸ","ssangdigeut","쌍디귿 (된소리)","紧音 ㄸ，发音 dd","따","地方 / 打（tta）"],
+    ["ㅃ","ssangbieup","쌍비읍 (된소리)","紧音 ㅃ，发音 bb","빠","快（ppa）"],
+    ["ㅆ","ssangsiot","쌍시옷 (된소리)","紧音 ㅆ，发音 ss","싸","便宜（ssa）"],
+    ["ㅉ","ssangjieut","쌍지읒 (된소리)","紧音 ㅉ，发音 jj","짜","稠 / 咸（jja）"],
+    ["ㅏ","a","아 (모음)","单元音 ㅏ，发音 a","아","牙（a）"],
+    ["ㅑ","ya","야 (모음)","元音 ㅑ，发音 ya","야","孩子 / 也（ya）"],
+    ["ㅓ","eo","어 (모음)","单元音 ㅓ，发音 eo（似 o，介于 e-o 之间）","어","语 / 鱼（eo）"],
+    ["ㅕ","yeo","여 (모음)","元音 ㅕ，发音 yeo","여","女 / 旅（yeo）"],
+    ["ㅗ","o","오 (모음)","单元音 ㅗ，发音 o","오","五 / 哦（o）"],
+    ["ㅛ","yo","요 (모음)","元音 ㅛ，发音 yo","요","要 / 腰（yo）"],
+    ["ㅜ","u","우 (모음)","单元音 ㅜ，发音 u","우","雨 / 右（u）"],
+    ["ㅠ","yu","유 (모음)","元音 ㅠ，发音 yu","유","邮 / 有（yu）"],
+    ["ㅡ","eu","으 (모음)","单元音 ㅡ，发音 eu（轻“呃”）","으","表示“的”音（eu）"],
+    ["ㅣ","i","이 (모음)","单元音 ㅣ，发音 i","이","二 / 牙（i）"],
+    ["ㅐ","ae","애 (모음)","复合元音 ㅐ，发音 ae","애","唉（ae）"],
+    ["ㅒ","yae","얘 (모음)","复合元音 ㅒ，发音 yae","얘","孩子 / 얘기（yae）"],
+    ["ㅔ","e","에 (모음)","复合元音 ㅔ，发音 e","에","哎 / 位置（e）"],
+    ["ㅖ","ye","예 (모음)","复合元音 ㅖ，发音 ye","예","礼 / 例（ye）"],
+    ["ㅘ","wa","와 (모음)","复合元音 ㅘ，发音 wa","와","和 / 瓦（wa）"],
+    ["ㅙ","wae","왜 (모음)","复合元音 ㅙ，发音 wae","왜","为什么 / 歪（wae）"],
+    ["ㅚ","oe","외 (모음)","复合元音 ㅚ，发音 oe","외","外 / 胃（oe）"],
+    ["ㅝ","wo","워 (모음)","复合元音 ㅝ，发音 wo","워","越 / 워（wo）"],
+    ["ㅞ","we","웨 (모음)","复合元音 ㅞ，发音 we","웨","威 / 喂（we）"],
+    ["ㅟ","wi","위 (모음)","复合元音 ㅟ，发音 wi","위","胃 / 位（wi）"],
+    ["ㅢ","ui","의 (모음)","复合元音 ㅢ，发音 ui","의","的 / 衣（ui）"]
+  ];
+  return A.map(function(r){
+    return {id:uid(),term:r[0],phon:r[1],kr:r[2]||"",mean:r[3],ex:r[4],exCn:r[5]||"",
+      book:"韩语字母",addedAt:d,lastReviewed:null,reviewCount:0,mastery:0,
+      history:[{t:d,act:"add"}],source:"seed"};
+  });
+}
+function ensureAlphabetBook(){
+  try{
+    if(WORDS.some(function(w){return (w.book||"")==="韩语字母";})) return;
+    WORDS=WORDS.concat(alphabetSeed());
+    save();
+  }catch(e){console.warn("ensureAlphabetBook",e);}
+}
 /* ============ [M02 云词库·管理员 · 第1部分] 云词库总控（云端书本订阅·家长远程增词·管理员口令；手机重启即同步） ============ */
 const LIB_MASTER_ID="master";
 const LIB_BOOK_SELF="自己添加";
@@ -874,7 +933,7 @@ async function openAdminLib(){
 function adminLogin(onOk){
   const html=`<div class="card" style="padding:18px;max-width:340px">
     <h3 style="margin:0 0 6px">🔐 云端管理员登录</h3>
-    <p class="muted small" style="font-size:12px;margin:0 0 8px">输入云端管理密码，才能批量编辑共用词库。初始密码请联系管理员（默认 chenfeng2026，请尽快修改）。</p>
+    <p class="muted small" style="font-size:12px;margin:0 0 8px">输入云端管理密码，才能批量编辑共用词库。初始密码为 1234（若已修改请填新密码；默认密码请尽快修改）。</p>
     <input id="adPwd" type="password" style="width:100%;padding:10px;font-size:16px;border:2px solid var(--line);border-radius:10px" placeholder="管理密码">
     <div id="adErr" class="small" style="color:var(--bad);min-height:18px;margin-top:6px"></div>
     <button class="btn" id="adOk" style="width:100%;margin-top:6px">登录</button>

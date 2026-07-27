@@ -1,4 +1,4 @@
-const CACHE = "koreanword-v2";
+const CACHE = "koreanword-v3";
 const FILES = ["index.html", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", e => {
