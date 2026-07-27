@@ -21,8 +21,17 @@ create table if not exists koreanword_backups (
 );
 alter table koreanword_backups enable row level security;
 -- 用 anon key 直接读写（device_id 为随机 UUID，不可猜测 = 弱隔离；与英语一致）
-create policy "kw_backups_anon_all" on koreanword_backups
-  for all using (true) with check (true);
+-- PostgreSQL create policy 没有 IF NOT EXISTS，用 DO 块幂等化，方便重复执行
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'koreanword_backups' and policyname = 'kw_backups_anon_all'
+  ) then
+    create policy "kw_backups_anon_all" on koreanword_backups
+      for all using (true) with check (true);
+  end if;
+end $$;
 
 -- 2) 共享词库表（id='master' 存词库；管理员写需带 x-admin-pwd 头，服务端校验）
 create table if not exists koreanword_lib (
@@ -31,16 +40,29 @@ create table if not exists koreanword_lib (
   updated_at timestamptz default now()
 );
 alter table koreanword_lib enable row level security;
-create policy "kw_lib_anon_read" on koreanword_lib for select using (true);
-create policy "kw_lib_admin_write" on koreanword_lib for all
-  using (
-    current_setting('request.headers', true)::json->>'x-admin-pwd'
-    = (select pwd from koreanword_admin where id='admin')
-  )
-  with check (
-    current_setting('request.headers', true)::json->>'x-admin-pwd'
-    = (select pwd from koreanword_admin where id='admin')
-  );
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'koreanword_lib' and policyname = 'kw_lib_anon_read'
+  ) then
+    create policy "kw_lib_anon_read" on koreanword_lib for select using (true);
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'koreanword_lib' and policyname = 'kw_lib_admin_write'
+  ) then
+    create policy "kw_lib_admin_write" on koreanword_lib for all
+      using (
+        current_setting('request.headers', true)::json->>'x-admin-pwd'
+        = (select pwd from koreanword_admin where id='admin')
+      )
+      with check (
+        current_setting('request.headers', true)::json->>'x-admin-pwd'
+        = (select pwd from koreanword_admin where id='admin')
+      );
+  end if;
+end $$;
 
 -- 3) 管理员密码校验 / 修改 RPC（韩语专属，避免与英语 verify_admin / set_admin_pwd 重名冲突）
 create or replace function koreanword_verify_admin(in_pwd text)
