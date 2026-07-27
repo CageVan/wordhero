@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=6;
+window.SITE_VER=7;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
