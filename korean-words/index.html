@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=5;
+window.SITE_VER=6;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -893,12 +893,16 @@ async function cloudLibPut(books){
 }
 /* 验证管理密码（RPC，密码只在服务端比对） */
 async function verifyAdmin(pwd){
-  const c=cloudCreds(); if(!c.url||!c.key) return {ok:false};
+  const c=cloudCreds(); if(!c.url||!c.key) return {ok:false,reason:"noconf"};
   try{
     const r=await fetch(c.url+"/rest/v1/rpc/koreanword_verify_admin",{method:"POST",
       headers:Object.assign({},cloudHeaders(c.key),{"Content-Type":"application/json"}),
       body:JSON.stringify({pwd:pwd})});
-    if(!r.ok) return {ok:false,status:r.status};
+    if(!r.ok){
+      let msg=""; try{const j=await r.json(); msg=(j&&(j.message||j.hint))||"";}catch(e){}
+      // RPC 不存在（建表 SQL 未跑）→ 云端词库未初始化
+      return {ok:false,status:r.status,notFound:/function|not found|42P01|does not exist/i.test(msg)};
+    }
     const j=await r.json(); return {ok:!!j};
   }catch(e){ return {ok:false,err:e.message}; }
 }
@@ -955,7 +959,13 @@ function adminLogin(onOk){
     const i=document.getElementById("adPwd"); const v=(i?i.value:"").trim(); if(!v) return;
     const r=await verifyAdmin(v);
     if(r.ok){ ADMIN_PWD=v; try{sessionStorage.setItem("kw_admin_ok","1");}catch(e){} closeModal(); if(typeof onOk==="function"){ await onOk(); } else { await renderAdminLib(); } }
-    else{ const e=document.getElementById("adErr"); if(e)e.textContent="❌ 密码错误"; }
+    else{
+      const e=document.getElementById("adErr"); if(!e) return;
+      if(r.notFound) e.textContent="⚠️ 云端词库尚未初始化：请在 Supabase 后台 SQL Editor 粘贴运行 koreanword_tables.sql（脚本在 APP 目录 Korean韩语单词本/supabase/ 下）";
+      else if(r.reason==="noconf") e.textContent="⚠️ 云端未配置，无法验证密码";
+      else if(r.err) e.textContent="⚠️ 网络错误，请检查联网后重试";
+      else e.textContent="❌ 密码错误，请重试";
+    }
   };
   document.getElementById("adOk").onclick=tryLogin;
   document.getElementById("adCancel").onclick=closeModal;
