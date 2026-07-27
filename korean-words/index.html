@@ -13,7 +13,7 @@
 <script>
 /* 版本自检：每次加载都向服务器无缓存拉取 version.json，若版本号变化则强制刷新整页。
    专门解决「App 内 WebView 缓存旧页面、看不到新改动」的问题。 */
-window.SITE_VER=4;
+window.SITE_VER=5;
 (function(){
   try{
     fetch('version.json?_='+Date.now(),{cache:'no-store'})
@@ -86,6 +86,10 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
   .flash .ex{color:#55617a;font-size:15px;margin-top:10px;max-width:100%}
   .flash .hint{color:var(--muted);font-size:13px;margin-top:16px}
   .speak{font-size:30px;border:none;background:#fff;border-radius:50%;width:54px;height:54px;box-shadow:var(--shadow);cursor:pointer;margin-top:12px}
+  .speak-pill{display:inline-flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:var(--accent);background:#eef2fb;border:1px solid var(--line);border-radius:999px;padding:10px 18px;cursor:pointer;box-shadow:0 2px 8px rgba(79,124,255,.12);transition:transform .08s ease,background .15s}
+  .speak-pill:hover{background:#e6ecfa}
+  .speak-pill:active{transform:scale(.96);background:#dde6f8}
+  .speak-pill .ico{font-size:18px;line-height:1}
   .opt{display:block;width:100%;text-align:left;background:#fff;border:2px solid var(--line);border-radius:14px;padding:14px;margin:8px 0;font-size:16px;font-weight:700;cursor:pointer;overflow-wrap:normal}
   .opt.ok{border-color:var(--good);background:#eafff6}
   .opt.no{border-color:var(--bad);background:#fff0f2}
@@ -506,7 +510,7 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
         </div>
         <div id="bkCloudBox" class="hidden">
           <label>学生姓名（在看板里区分是谁）</label>
-          <input id="ckName" placeholder="例如 陈锋">
+          <input id="ckName" placeholder="例如 韩小语">
           <div id="bkGlobalNote" class="hidden" style="background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.4);color:#1e7a45;padding:8px 10px;border-radius:8px;font-size:13px;margin-bottom:8px">
             ✅ 本应用已由管理员统一接入云端。<b>打开后填一次真实姓名即可</b>（无需注册、无需邮箱/手机号），之后学习进度自动同步到看板。
           </div>
@@ -531,7 +535,7 @@ iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAb0ElEQVR42u3dS5IsZ3nH4bMEr8dYQvJt
           <label>备份服务器地址</label>
           <input id="bkUrl" placeholder="例如 https://xxxx.loca.lt 或 http://192.168.1.5:3000">
           <label>设备名（区分手机/电脑）</label>
-          <input id="bkDevice" value="陈锋的手机" placeholder="例如 陈锋的手机">
+          <input id="bkDevice" value="我的手机" placeholder="例如 我的手机">
           <div class="row">
             <button class="btn green" id="bkUp">⬆ 上传备份</button>
             <button class="btn" id="bkDown">⬇ 下载恢复</button>
@@ -982,6 +986,7 @@ async function renderAdminLib(){
     </div>
     <p class="muted small" style="font-size:12px;margin:4px 0 8px">这些词库会推送给所有学生，学生在“我的→书本”里自行订阅。${res.updated_at?('云端更新：'+fmt(res.updated_at)):''}</p>
     <button class="btn" id="adNewBook" style="width:100%;margin-bottom:8px">➕ 新建词库</button>
+    ${books.length===0?`<button class="btn alt" id="adSeedAlpha" style="width:100%;margin-bottom:8px">⚡ 一键生成「韩语字母」书</button>`:""}
     <div id="adBooks">${bookHtml}</div>
     <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
     <button class="btn ghost" id="adChgPwd" style="width:100%;font-size:13px">🔑 修改管理密码</button>
@@ -995,6 +1000,8 @@ async function renderAdminLib(){
       books.push({name:name,words:[]}); adminSave(books);
     });
   };
+  const seedBtn=document.getElementById("adSeedAlpha");
+  if(seedBtn) seedBtn.onclick=seedCloudAlphabet;
   document.querySelectorAll("[data-rename]").forEach(btn=>btn.onclick=()=>{
     const i=+btn.getAttribute("data-rename"); const b=books[i];
     inputDialog("重命名词库",b.name,(n)=>{
@@ -1016,6 +1023,16 @@ function adminSave(books){
     if(r.ok){ toast("✅ 已保存到云端"); renderAdminLib(); }
     else{ toast("❌ 保存失败："+(r.status||r.err||"未知")+(r.status===401||r.status===403?"（管理密码可能已失效，请重新进入）":"")); }
   });
+}
+/* 管理员一键生成「韩语字母」书（40 字母）到云端共用词库，免去手动跑 SQL */
+async function seedCloudAlphabet(){
+  const res=await cloudLibGet();
+  if(!res.ok){ toast("⚠️ 无法连接云端词库"); return; }
+  const books=res.books||[];
+  if(books.find(b=>b.name==="韩语字母")){ toast("「韩语字母」书已在云端"); return; }
+  const r=await cloudLibPut(books.concat([ALPHABET_BOOK]));
+  if(r.ok){ toast("✅ 已生成「韩语字母」书到云端"); renderAdminLib(); }
+  else{ toast("❌ 生成失败："+(r.err||r.status||"未知错误")); }
 }
 function adminAddWords(books,i){
   const b=books[i];
@@ -1080,7 +1097,7 @@ async function openCloudLibSubscribe(){
   const el=document.getElementById("clList");
   if(!res.ok){ el.innerHTML="⚠️ 无法连接云端（请确认已运行建表 SQL）。"+(res.err?(" "+esc(res.err)):""); return; }
   const books=res.books||[]; const sub=subLibs();
-  if(!books.length){ el.innerHTML="云端还没有共用词库。需要管理员（陈锋）在「👪 家长 → 云端词库管理」里先创建。"; return; }
+  if(!books.length){ el.innerHTML="云端还没有共用词库。需要管理员在「👪 家长 → 云端词库管理」里先创建（或点「⚡ 一键生成韩语字母书」）。"; return; }
   el.innerHTML=books.map(b=>`<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
     <b style="flex:1">📚 ${esc(b.name)}</b><span class="muted small">${(b.words||[]).length}词</span>
     ${sub.includes(b.name)?`<button class="btn ghost" data-unsub="${esc(b.name)}" style="font-size:12px;color:#e0524d">从本地移除</button>`:`<button class="btn green" data-sub="${esc(b.name)}" style="font-size:12px">添加到本地</button>`}
@@ -1867,6 +1884,49 @@ const COMB_MEAN={'가':'家 / 去','나':'我','다':'都 / 全部','마':'马',
 /* 按谚文组合规则生成音节：codepoint = 0xAC00 + (初声序*21 + 中声序)*28 */
 function combCompose(c,v){const ci=COMB_CHO.indexOf(c),vj=COMB_JUNG.indexOf(v);if(ci<0||vj<0)return '';return String.fromCharCode(0xAC00+(ci*21+vj)*28);}
 function combRoman(c,v){return (COMB_CHO_R[c]||'')+(COMB_JUNG_R[v]||'');}
+/* 云端「韩语字母」书（40 字母），供管理员一键生成到云端共用词库（免去手动跑 SQL） */
+const ALPHABET_BOOK={name:"韩语字母",words:[
+ {t:"ㄱ",p:"giyeok",d:"辅音 ㄱ，发音近似 g（词首轻、不送气）",ex:"가",exCn:"家 / 去（ga）"},
+ {t:"ㄴ",p:"nieun",d:"辅音 ㄴ，发音 n",ex:"나",exCn:"我（na）"},
+ {t:"ㄷ",p:"digeut",d:"辅音 ㄷ，发音近似 d（不送气）",ex:"다",exCn:"题 / 给（da）"},
+ {t:"ㄹ",p:"rieul",d:"辅音 ㄹ，发音 r/l（颤音或边音）",ex:"라",exCn:"乐 / 来（ra）"},
+ {t:"ㅁ",p:"mieum",d:"辅音 ㅁ，发音 m",ex:"마",exCn:"马（ma）"},
+ {t:"ㅂ",p:"bieup",d:"辅音 ㅂ，发音 b（不送气）",ex:"바",exCn:"梨 / 船（ba）"},
+ {t:"ㅅ",p:"siot",d:"辅音 ㅅ，发音 s",ex:"사",exCn:"事 / 四（sa）"},
+ {t:"ㅇ",p:"ieung",d:"辅音 ㅇ：作初声不发音；作终声发 ng",ex:"아",exCn:"牙（a）"},
+ {t:"ㅈ",p:"jieut",d:"辅音 ㅈ，发音 j（不送气）",ex:"자",exCn:"子（ja）"},
+ {t:"ㅊ",p:"chieut",d:"辅音 ㅊ，发音 ch（送气）",ex:"차",exCn:"茶（cha）"},
+ {t:"ㅋ",p:"kieuk",d:"辅音 ㅋ，发音 k（送气）",ex:"카",exCn:"卡（ka）"},
+ {t:"ㅌ",p:"tieut",d:"辅音 ㅌ，发音 t（送气）",ex:"타",exCn:"他（ta）"},
+ {t:"ㅍ",p:"pieup",d:"辅音 ㅍ，发音 p（送气）",ex:"파",exCn:"葱 / 坡（pa）"},
+ {t:"ㅎ",p:"hieut",d:"辅音 ㅎ，发音 h",ex:"하",exCn:"河 / 下（ha）"},
+ {t:"ㄲ",p:"ssanggiyeok",d:"紧音 ㄲ，发音 gɡ（用力、不送气）",ex:"까",exCn:"硬 / 岁月（kka）"},
+ {t:"ㄸ",p:"ssangdigeut",d:"紧音 ㄸ，发音 dd",ex:"따",exCn:"地方 / 打（tta）"},
+ {t:"ㅃ",p:"ssangbieup",d:"紧音 ㅃ，发音 bb",ex:"빠",exCn:"快（ppa）"},
+ {t:"ㅆ",p:"ssangsiot",d:"紧音 ㅆ，发音 ss",ex:"싸",exCn:"便宜（ssa）"},
+ {t:"ㅉ",p:"ssangjieut",d:"紧音 ㅉ，发音 jj",ex:"짜",exCn:"稠 / 咸（jja）"},
+ {t:"ㅏ",p:"a",d:"单元音 ㅏ，发音 a",ex:"아",exCn:"牙（a）"},
+ {t:"ㅑ",p:"ya",d:"元音 ㅑ，发音 ya",ex:"야",exCn:"孩子 / 也（ya）"},
+ {t:"ㅓ",p:"eo",d:"单元音 ㅓ，发音 eo（似 o，介于 e-o 之间）",ex:"어",exCn:"语 / 鱼（eo）"},
+ {t:"ㅕ",p:"yeo",d:"元音 ㅕ，发音 yeo",ex:"여",exCn:"女 / 旅（yeo）"},
+ {t:"ㅗ",p:"o",d:"单元音 ㅗ，发音 o",ex:"오",exCn:"五 / 哦（o）"},
+ {t:"ㅛ",p:"yo",d:"元音 ㅛ，发音 yo",ex:"요",exCn:"要 / 腰（yo）"},
+ {t:"ㅜ",p:"u",d:"单元音 ㅜ，发音 u",ex:"우",exCn:"雨 / 右（u）"},
+ {t:"ㅠ",p:"yu",d:"元音 ㅠ，发音 yu",ex:"유",exCn:"邮 / 有（yu）"},
+ {t:"ㅡ",p:"eu",d:"单元音 ㅡ，发音 eu（轻“呃”）",ex:"으",exCn:"表示“的”音（eu）"},
+ {t:"ㅣ",p:"i",d:"单元音 ㅣ，发音 i",ex:"이",exCn:"二 / 牙（i）"},
+ {t:"ㅐ",p:"ae",d:"复合元音 ㅐ，发音 ae",ex:"애",exCn:"唉（ae）"},
+ {t:"ㅒ",p:"yae",d:"复合元音 ㅒ，发音 yae",ex:"얘",exCn:"孩子 / 얘기（yae）"},
+ {t:"ㅔ",p:"e",d:"复合元音 ㅔ，发音 e",ex:"에",exCn:"哎 / 位置（e）"},
+ {t:"ㅖ",p:"ye",d:"复合元音 ㅖ，发音 ye",ex:"예",exCn:"礼 / 例（ye）"},
+ {t:"ㅘ",p:"wa",d:"复合元音 ㅘ，发音 wa",ex:"와",exCn:"和 / 瓦（wa）"},
+ {t:"ㅙ",p:"wae",d:"复合元音 ㅙ，发音 wae",ex:"왜",exCn:"为什么 / 歪（wae）"},
+ {t:"ㅚ",p:"oe",d:"复合元音 ㅚ，发音 oe",ex:"외",exCn:"外 / 胃（oe）"},
+ {t:"ㅝ",p:"wo",d:"复合元音 ㅝ，发音 wo",ex:"워",exCn:"越 / 워（wo）"},
+ {t:"ㅞ",p:"we",d:"复合元音 ㅞ，发音 we",ex:"웨",exCn:"威 / 喂（we）"},
+ {t:"ㅟ",p:"wi",d:"复合元音 ㅟ，发音 wi",ex:"위",exCn:"胃 / 位（wi）"},
+ {t:"ㅢ",p:"ui",d:"复合元音 ㅢ，发音 ui",ex:"의",exCn:"的 / 衣（ui）"}
+]};
 let COMBINE=null;
 function startCombine(){
   COMBINE={correct:0,total:0};
@@ -1897,7 +1957,7 @@ function combineRender(){
       <div class="comb-opts">${arr.map(s=>'<button class="comb-opt" onclick="combinePick(\''+s+'\',this)">'+s+'</button>').join("")}</div>
       <div id="combMsg" class="small" style="margin-top:12px;text-align:center;font-weight:800;min-height:22px"></div>
       <div class="row" style="margin-top:12px;justify-content:center;gap:10px">
-        <button class="speak" onclick="speak('${target}')" title="听这个音节的发音">🔊 听答案</button>
+        <button class="speak-pill" onclick="speak('${target}')"><span class="ico">🔊</span>听发音</button>
         <button class="btn ghost" onclick="closePractice()">退出</button>
       </div>
     </div>`);
@@ -2575,7 +2635,7 @@ function renderParentPanel(){
 
   const weakHtml=(weak.length?weak.map((w,i)=>`<div class="weakitem click" data-idx="${i}" style="display:${i<5?'':'none'}" onclick="showWord('${w.id}')"><div class="w">${esc(w.term)} <span class="muted small">${esc(w.phon||"")}</span></div><div class="m">${esc(w.mean)}</div><span class="pill ${mLevel(w.mastery)}">${w.mastery}%</span></div>`).join(""):`<div class="muted small">暂时没有薄弱词，掌握得很好 👍</div>`)+(weak.length>5?`<div class="more-row"><button id="weakMoreBtn" class="more-btn" onclick="toggleWeakMore()">… 更多（共 ${weak.length} 个）</button></div>`:"");
 
-  const report=`【陈锋本周单词学习报告】
+  const report=`【本周单词学习报告】
 累计学习：${days.size} 天（连续 ${STREAK.count} 天）
 当前书本进度：${p.pct}%（已掌握 ${p.mastered}/${p.total}）
 今日复习：${todayReviews} 次（正确率 ${acc}%）
@@ -2654,7 +2714,7 @@ function fallbackCopy(t){const ta=document.createElement("textarea");ta.value=t;
           const b=await r.blob();
           const a=document.createElement("a");
           a.href=URL.createObjectURL(b);
-          a.download="陈锋词汇V1.1-webview.apk";
+          a.download="韩语单词本-备份.apk";
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(()=>URL.revokeObjectURL(a.href),4000);
           e.preventDefault();
@@ -2780,7 +2840,7 @@ function applyBkUI(){
   const mode = global ? "cloud" : (s.mode||"file");
   document.getElementById("bkMode").value=mode;
   document.getElementById("bkUrl").value=s.url||"";
-  document.getElementById("bkDevice").value=s.device||"陈锋的手机";
+  document.getElementById("bkDevice").value=s.device||"我的手机";
   document.getElementById("bkServerBox").classList.toggle("hidden",mode!=="server");
   document.getElementById("bkCloudBox").classList.toggle("hidden",mode!=="cloud");
   const cn=document.getElementById("ckName"); if(cn) cn.value=s.ckName||"";
@@ -2801,7 +2861,7 @@ function applyBkUI(){
 }
 document.getElementById("bkMode").onchange=()=>{const s=bkSettings();s.mode=document.getElementById("bkMode").value;saveBk(s);applyBkUI();};
 document.getElementById("bkUrl").oninput=()=>{const s=bkSettings();s.url=document.getElementById("bkUrl").value.trim();saveBk(s);};
-document.getElementById("bkDevice").oninput=()=>{const s=bkSettings();s.device=document.getElementById("bkDevice").value.trim()||"陈锋的手机";saveBk(s);};
+document.getElementById("bkDevice").oninput=()=>{const s=bkSettings();s.device=document.getElementById("bkDevice").value.trim()||"我的手机";saveBk(s);};
 
 async function bkCall(path){
   const s=bkSettings();const base=(s.url||"").replace(/\/$/,"");
@@ -2811,7 +2871,7 @@ async function bkCall(path){
 async function bkUpload(){
   const s=bkSettings();
   if(s.mode!=="server"||!s.url){toast("请先在备份方式选“个人备份服务器”并填地址");return;}
-  const dev=s.device||"陈锋的手机";
+  const dev=s.device||"我的手机";
   const payload={device:dev,words:WORDS,streak:STREAK,savedAt:Date.now()};
   try{
     const r=await fetch((s.url).replace(/\/$/,"")+"/backup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
@@ -2824,7 +2884,7 @@ async function bkUpload(){
 async function bkDownload(){
   const s=bkSettings();
   if(s.mode!=="server"||!s.url){toast("请先设置备份服务器");return;}
-  const dev=s.device||"陈锋的手机";
+  const dev=s.device||"我的手机";
   try{
     const j=await bkCall("/backup?device="+encodeURIComponent(dev));
     if(!j.ok){document.getElementById("bkReport").textContent="ℹ️ 服务器还没有“"+dev+"”的备份，去点“上传备份”吧。";return;}
@@ -2842,7 +2902,7 @@ async function bkDownload(){
 async function bkVerify(){
   const s=bkSettings();
   if(s.mode!=="server"||!s.url){toast("请先设置备份服务器");return;}
-  const dev=s.device||"陈锋的手机";
+  const dev=s.device||"我的手机";
   try{
     const j=await bkCall("/meta?device="+encodeURIComponent(dev));
     if(!j.ok){document.getElementById("bkReport").textContent="ℹ️ 服务器还没有“"+dev+"”的备份，去点“上传备份”吧。";return;}
@@ -3078,7 +3138,7 @@ function renderLoginForm(){
     <h2>韩语单词小英雄</h2>
     <p class="lg-sub">请输入信息开始使用。<br>换手机？填 <b>姓名 + 唯一ID码</b> 即可一键恢复之前的学习数据。</p>
     <label>真实姓名</label>
-    <input id="lgName" placeholder="例如 陈锋" autocomplete="off">
+    <input id="lgName" placeholder="例如 韩小语" autocomplete="off">
     <label>唯一ID码 <span class="lg-opt">（换手机恢复时填写；首次使用留空将自动生成）</span></label>
     <input id="lgUid" placeholder="如 KW-AB3K9X（留空=创建新账号）" autocomplete="off" style="text-transform:uppercase">
     <label class="lg-chk"><input type="checkbox" id="lgParent"> 我是家长</label>
@@ -3572,7 +3632,7 @@ function openAddKid(){
   const html=`<div class="card" style="padding:20px;max-width:360px">
     <h3 style="margin:0 0 6px">➕ 添加孩子</h3>
     <p class="muted small" style="font-size:12px;margin:0 0 8px">输入孩子的 <b>姓名</b> 和 <b>唯一ID码</b>（在孩子手机“我的”里能看到）。添加后即可在“查看孩子数据”看到 TA 的进度。</p>
-    <label>孩子姓名</label><input id="kidName" placeholder="例如 陈锋" autocomplete="off">
+    <label>孩子姓名</label><input id="kidName" placeholder="例如 韩小语" autocomplete="off">
     <label>孩子ID码</label><input id="kidUid" placeholder="如 KW-AB3K9X" autocomplete="off" style="text-transform:uppercase">
     <div id="kidErr" class="lg-err"></div>
     <button class="btn green" id="kidOk" style="width:100%;margin-top:6px">添加</button>
